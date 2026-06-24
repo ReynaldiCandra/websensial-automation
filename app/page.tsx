@@ -1,399 +1,298 @@
 'use client'
 
 import { useState } from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
 import {
-  MessageCircle,
-  Zap,
-  BarChart3,
-  Users,
-  CheckCircle,
-  ArrowRight,
-  Sparkles,
+  Bot, Flame, MessageCircle, FileText, GitMerge, BarChart3,
+  CheckCircle, ChevronDown, Menu, X, Zap, Shield, Clock,
+  TrendingUp, Users, Star, ArrowRight
 } from 'lucide-react'
 
-export default function LandingPage() {
-  const [email, setEmail] = useState('')
-  const [submitted, setSubmitted] = useState(false)
+const features = [
+  { icon: Bot, title: 'AI Training', desc: 'Isi produk, harga, FAQ, tone brand. AI menjawab berdasarkan data bisnismu, bukan jawaban generic.' },
+  { icon: Flame, title: 'Lead Scoring', desc: 'Deteksi buying signal otomatis. Hot, Warm, Cold langsung terbaca dari isi chat customer.' },
+  { icon: MessageCircle, title: 'WhatsApp Chat', desc: 'Balas chat 24/7 otomatis. Admin bisa ambil alih kapan saja dengan satu klik.' },
+  { icon: FileText, title: 'Quotation & Invoice', desc: 'Kirim penawaran dan invoice langsung dari chat. Customer tinggal bayar.' },
+  { icon: GitMerge, title: 'Pipeline CRM', desc: 'Pantau semua deal dari tanya produk sampai closing di satu kanban board.' },
+  { icon: BarChart3, title: 'Business Intelligence', desc: 'Lihat revenue, konversi, AI adoption rate, dan performa sales secara real-time.' },
+]
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setSubmitted(true)
-    setEmail('')
-    setTimeout(() => setSubmitted(false), 3000)
-  }
+const steps = [
+  { icon: MessageCircle, num: '1', title: 'Customer Chat', desc: 'Customer tanya harga, promo, stok, atau cara order lewat WhatsApp.' },
+  { icon: Bot, num: '2', title: 'AI Handle', desc: 'AI balas sesuai produk, harga, FAQ, dan tone brand yang sudah kamu isi.' },
+  { icon: Zap, num: '3', title: 'Closing Action', desc: 'AI deteksi hot lead, kirim quotation atau invoice, dan follow-up otomatis.' },
+  { icon: BarChart3, num: '4', title: 'Deal Terpantau', desc: 'Pipeline update, owner bisa lihat lead, invoice, dan revenue dari dashboard.' },
+]
+
+const plans = [
+  {
+    name: 'Trial', monthlyPrice: 0, yearlyPrice: 0, badge: '',
+    desc: 'Coba dulu 7 hari gratis',
+    features: ['50 Customer / trial', '100 Credit', '1 nomor WhatsApp', '2 user', 'Lead Scoring', 'Pipeline CRM'],
+  },
+  {
+    name: 'Starter', monthlyPrice: 199000, yearlyPrice: 99500, badge: '',
+    desc: 'Untuk bisnis kecil',
+    features: ['300 Customer / bulan', '2.000 Credit', '1 nomor WhatsApp', '2 user', '25 Produk & 50 FAQ', 'Lead Scoring & Pipeline'],
+  },
+  {
+    name: 'Growth', monthlyPrice: 499000, yearlyPrice: 249500, badge: 'Paling Populer',
+    desc: 'Paling pas untuk scale',
+    features: ['1.000 Customer / bulan', '7.500 Credit', '1 nomor WA & 5 user', '100 Produk & 200 FAQ', '5x Scan Brand / bulan', 'Full Auto & Pipeline'],
+  },
+  {
+    name: 'Business', monthlyPrice: 999000, yearlyPrice: 499500, badge: '',
+    desc: 'Volume chat aktif',
+    features: ['3.000 Customer / bulan', '18.000 Credit', '3 nomor WA & 15 user', '500 Produk & 1.000 FAQ', 'Quotation & Invoice', 'Advanced Analytics & API'],
+  },
+]
+
+const faqs = [
+  { q: 'Apakah AI bisa tahu produk saya?', a: 'Bisa. Isi Produk & Harga, FAQ, cara menjawab, atau pakai Scan Brand Otomatis agar AI punya konteks yang jelas tentang bisnis kamu.' },
+  { q: 'Apakah bisa menggantikan admin?', a: 'Bisa jadi co-pilot dulu, bisa juga full auto. Mulai dari mode suggestion, lanjut semi auto, lalu full auto setelah data training terasa aman.' },
+  { q: 'Apakah AI bisa urus invoice sampai bayar?', a: 'Bisa. AI bisa membuat quotation, mengubahnya jadi invoice, mengirim instruksi bayar, follow-up pembayaran, dan memasukkan bukti bayar ke antrian review.' },
+  { q: 'Bagaimana kalau AI tidak yakin?', a: 'Chat akan ditandai perlu admin. Kamu bisa ambil alih manual, kirim attachment, tambah catatan, lalu resume AI lagi saat sudah aman.' },
+]
+
+function formatPrice(price: number) {
+  if (price === 0) return 'Gratis'
+  return `Rp${(price / 1000).toFixed(0)}rb`
+}
+
+export default function LandingPage() {
+  const [billing, setBilling] = useState<'monthly' | 'yearly'>('monthly')
+  const [openFaq, setOpenFaq] = useState<number | null>(null)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   return (
-    <div className="min-h-screen bg-white text-gray-900">
-      {/* Navigation */}
-      <nav className="sticky top-0 z-50 border-b border-gray-100 bg-white/90 backdrop-blur-sm">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center">
-            <Image
-              src="/websensial-logo-teal.png"
-              alt="Websensial"
-              width={180}
-              height={48}
-              className="h-10 w-auto"
-            />
+    <div style={{ fontFamily: 'Inter, sans-serif', color: '#111' }}>
+
+      {/* NAVBAR */}
+      <nav style={{ position: 'sticky', top: 0, zIndex: 50, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(8px)', borderBottom: '0.5px solid #e5e7eb', padding: '0 24px' }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 60 }}>
+          <span style={{ fontSize: 18, fontWeight: 700, color: '#0F6E56' }}>Websensial</span>
+          <div style={{ display: 'flex', gap: 28, alignItems: 'center' }} className="hidden-mobile">
+            {['Cara Kerja', 'Fitur', 'Harga', 'FAQ'].map(item => (
+              <a key={item} href={`#${item.toLowerCase().replace(' ', '-')}`}
+                style={{ fontSize: 14, color: '#374151', textDecoration: 'none', fontWeight: 500 }}>
+                {item}
+              </a>
+            ))}
           </div>
-          <div className="hidden md:flex gap-8 items-center">
-            <a href="#features" className="text-sm text-gray-600 hover:text-teal-600 transition font-medium">
-              Fitur
-            </a>
-            <a href="#pricing" className="text-sm text-gray-600 hover:text-teal-600 transition font-medium">
-              Harga
-            </a>
-            <a href="#cara-kerja" className="text-sm text-gray-600 hover:text-teal-600 transition font-medium">
-              Cara Kerja
-            </a>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <Link href="/auth/login">
-              <Button variant="outline" size="sm" className="border-teal-600 text-teal-600 hover:bg-teal-50">
-                Masuk
-              </Button>
+              <button style={{ padding: '8px 16px', border: '0.5px solid #e5e7eb', borderRadius: 8, background: 'white', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: '#374151' }}>
+                Login
+              </button>
             </Link>
-            <Link href="/auth/sign-up">
-              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white">
-                Mulai Gratis
-              </Button>
-            </Link>
-          </div>
-          {/* Mobile nav */}
-          <div className="flex md:hidden gap-2">
-            <Link href="/auth/login">
-              <Button variant="outline" size="sm" className="border-teal-600 text-teal-600 text-xs">Masuk</Button>
-            </Link>
-            <Link href="/auth/sign-up">
-              <Button size="sm" className="bg-teal-600 hover:bg-teal-700 text-white text-xs">Daftar</Button>
+            <Link href="/auth/signup">
+              <button style={{ padding: '8px 16px', border: 'none', borderRadius: 8, background: '#0F6E56', fontSize: 13, fontWeight: 500, cursor: 'pointer', color: 'white' }}>
+                Mulai Trial
+              </button>
             </Link>
           </div>
         </div>
       </nav>
 
-      {/* Hero Section */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-white via-teal-50/30 to-white">
-        <div className="max-w-6xl mx-auto text-center">
-          <div className="inline-flex items-center gap-2 bg-teal-50 border border-teal-200 rounded-full px-4 py-1.5 mb-8">
-            <Sparkles className="w-3.5 h-3.5 text-teal-600" />
-            <span className="text-sm text-teal-700 font-medium">AI Sales Automation untuk WhatsApp</span>
+      {/* HERO */}
+      <section style={{ background: '#020617', color: 'white', padding: '80px 24px 100px', textAlign: 'center' }}>
+        <div style={{ maxWidth: 720, margin: '0 auto' }}>
+          <div style={{ display: 'inline-block', background: 'rgba(29,158,117,0.15)', border: '0.5px solid rgba(29,158,117,0.4)', borderRadius: 99, padding: '6px 16px', fontSize: 13, color: '#5DCAA5', marginBottom: 24, fontWeight: 500 }}>
+            AI Sales Agent untuk WhatsApp
           </div>
-          <h1 className="text-5xl sm:text-6xl lg:text-7xl font-bold mb-6 leading-tight text-gray-900">
-            Jual Lebih Banyak,<br />
-            <span className="text-teal-600">Kerja Lebih Sedikit</span>
+          <h1 style={{ fontSize: 48, fontWeight: 700, lineHeight: 1.15, margin: '0 0 20px', letterSpacing: -1 }}>
+            AI yang handle chat WhatsApp kamu sampai{' '}
+            <span style={{ color: '#1D9E75' }}>closing</span>
           </h1>
-          <p className="text-xl text-gray-500 mb-10 max-w-2xl mx-auto leading-relaxed">
-            Websensial mengotomasi proses penjualan WhatsApp Anda — dari chat pertama sampai closing — dengan AI yang merespons natural layaknya tim sales terbaik.
+          <p style={{ fontSize: 18, color: '#94a3b8', lineHeight: 1.7, margin: '0 0 36px' }}>
+            Chat numpuk, customer minta harga, follow-up lupa, invoice telat? Biarkan AI jawab otomatis, kirim quotation, reminder, sampai closing.
           </p>
-          <div className="flex gap-4 justify-center flex-wrap">
-            <Link href="/auth/sign-up">
-              <Button size="lg" className="bg-teal-600 hover:bg-teal-700 text-white gap-2 px-8 py-6 text-base">
-                Coba Gratis Sekarang <ArrowRight className="w-4 h-4" />
-              </Button>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <Link href="/auth/signup">
+              <button style={{ padding: '14px 28px', background: '#1D9E75', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer', color: 'white', display: 'flex', alignItems: 'center', gap: 8 }}>
+                Coba Gratis 7 Hari <ArrowRight size={16} />
+              </button>
             </Link>
-            <a href="#cara-kerja">
-              <Button size="lg" variant="outline" className="border-gray-300 text-gray-700 hover:border-teal-600 hover:text-teal-600 px-8 py-6 text-base">
-                Lihat Cara Kerja
-              </Button>
+            <a href="#fitur">
+              <button style={{ padding: '14px 28px', background: 'transparent', border: '0.5px solid rgba(255,255,255,0.2)', borderRadius: 10, fontSize: 15, fontWeight: 500, cursor: 'pointer', color: 'white' }}>
+                Lihat Fitur
+              </button>
             </a>
           </div>
-
-          {/* Hero mockup */}
-          <div className="mt-16 rounded-2xl border border-gray-200 overflow-hidden shadow-2xl shadow-teal-100 bg-white mx-auto max-w-4xl">
-            <div className="bg-gray-50 px-4 py-3 border-b border-gray-200 flex items-center gap-2">
-              <div className="w-3 h-3 rounded-full bg-red-400"></div>
-              <div className="w-3 h-3 rounded-full bg-yellow-400"></div>
-              <div className="w-3 h-3 rounded-full bg-green-400"></div>
-              <div className="ml-4 bg-white rounded border border-gray-200 px-3 py-1 text-xs text-gray-400 w-64 text-left">
-                app.websensial.ai/dashboard
-              </div>
-            </div>
-            <div className="aspect-video bg-gradient-to-br from-teal-50 to-white flex items-center justify-center">
-              <div className="text-center">
-                <div className="w-20 h-20 bg-teal-100 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <MessageCircle className="w-10 h-10 text-teal-600" />
-                </div>
-                <p className="text-gray-400 text-sm font-medium">Dashboard Preview</p>
-                <p className="text-gray-300 text-xs mt-1">AI Chat · Leads · Analytics · Invoices</p>
-              </div>
-            </div>
-          </div>
         </div>
       </section>
 
-      {/* Stats */}
-      <section className="py-16 px-4 sm:px-6 lg:px-8 bg-gray-900">
-        <div className="max-w-6xl mx-auto grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div className="text-center">
-            <div className="text-4xl font-bold text-teal-400 mb-2">500+</div>
-            <p className="text-sm text-gray-400">Bisnis aktif</p>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-teal-400 mb-2">+60%</div>
-            <p className="text-sm text-gray-400">Closing rate naik</p>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-teal-400 mb-2">24/7</div>
-            <p className="text-sm text-gray-400">AI respons otomatis</p>
-          </div>
-          <div className="text-center">
-            <div className="text-4xl font-bold text-teal-400 mb-2">Rp 0</div>
-            <p className="text-sm text-gray-400">Biaya setup</p>
-          </div>
+      {/* SOCIAL PROOF BAR */}
+      <section style={{ background: '#0F6E56', padding: '20px 24px' }}>
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', justifyContent: 'center', gap: 48, flexWrap: 'wrap' }}>
+          {[
+            { icon: Users, label: '300+ bisnis aktif' },
+            { icon: MessageCircle, label: '60.000+ pesan diproses' },
+            { icon: TrendingUp, label: '+60% closing rate' },
+            { icon: Star, label: '11.300+ leads tercatat' },
+          ].map(({ icon: Icon, label }) => (
+            <div key={label} style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'white' }}>
+              <Icon size={16} style={{ opacity: 0.8 }} />
+              <span style={{ fontSize: 14, fontWeight: 500 }}>{label}</span>
+            </div>
+          ))}
         </div>
       </section>
 
-      {/* Features Section */}
-      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-teal-600 font-semibold text-sm uppercase tracking-wider mb-3">Fitur Unggulan</p>
-            <h2 className="text-4xl font-bold mb-4 text-gray-900">Semua yang Anda Butuhkan</h2>
-            <p className="text-lg text-gray-500 max-w-xl mx-auto">
-              Tools lengkap untuk scale penjualan tanpa tambah tim
-            </p>
+      {/* CARA KERJA */}
+      <section id="cara-kerja" style={{ padding: '80px 24px', background: '#f9fafb' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#1D9E75', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Cara Kerja</p>
+            <h2 style={{ fontSize: 34, fontWeight: 700, margin: 0 }}>Dari customer tanya harga sampai bukti bayar masuk</h2>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {[
-              {
-                icon: Sparkles,
-                title: 'AI Assistant Cerdas',
-                desc: 'Respons otomatis dengan 4 tone: Profesional, Ramah, Rendah Hati, Energik',
-                items: ['Respons natural & personal', 'Customize per audience', 'One-click insertion'],
-              },
-              {
-                icon: MessageCircle,
-                title: 'Live Chat WhatsApp',
-                desc: 'Semua percakapan customer dalam satu dashboard terpusat',
-                items: ['Real-time messaging', 'Multi-chat management', 'Riwayat chat lengkap'],
-              },
-              {
-                icon: Users,
-                title: 'Lead Management',
-                desc: 'Track lead dengan scoring otomatis dan temperature indicator',
-                items: ['AI Lead Scoring', 'Hot/Warm/Cold status', 'Pipeline management'],
-              },
-              {
-                icon: BarChart3,
-                title: 'Quotation & Invoice',
-                desc: 'Generate dan track penawaran & invoice secara otomatis',
-                items: ['Auto-generate dokumen', 'Pelacakan pembayaran', 'Revenue analytics'],
-              },
-              {
-                icon: Zap,
-                title: 'Automation Workflows',
-                desc: 'Set up rules untuk auto-respond & follow-up dengan timing yang tepat',
-                items: ['Trigger-based actions', 'Smart scheduling', 'No-code builder'],
-              },
-              {
-                icon: BarChart3,
-                title: 'Advanced Analytics',
-                desc: 'Dashboard real-time dengan insight mendalam tentang performa sales',
-                items: ['Conversion metrics', 'Revenue tracking', 'Custom reports'],
-              },
-            ].map((f, i) => {
-              const Icon = f.icon
-              return (
-                <div key={i} className="p-6 rounded-2xl border border-gray-100 hover:border-teal-200 hover:shadow-lg hover:shadow-teal-50 transition-all duration-200 bg-white group">
-                  <div className="w-12 h-12 bg-teal-50 rounded-xl flex items-center justify-center mb-4 group-hover:bg-teal-100 transition-colors">
-                    <Icon className="w-6 h-6 text-teal-600" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 24 }}>
+            {steps.map(({ icon: Icon, num, title, desc }) => (
+              <div key={num} style={{ background: 'white', border: '0.5px solid #e5e7eb', borderRadius: 12, padding: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                  <div style={{ width: 36, height: 36, borderRadius: 8, background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Icon size={18} color="#0F6E56" />
                   </div>
-                  <h3 className="text-lg font-bold mb-2 text-gray-900">{f.title}</h3>
-                  <p className="text-gray-500 text-sm mb-4 leading-relaxed">{f.desc}</p>
-                  <ul className="space-y-2">
-                    {f.items.map((item, j) => (
-                      <li key={j} className="flex gap-2 text-sm text-gray-600">
-                        <CheckCircle className="w-4 h-4 text-teal-500 flex-shrink-0 mt-0.5" />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: '#1D9E75', background: '#E1F5EE', padding: '2px 8px', borderRadius: 99 }}>Step {num}</span>
                 </div>
-              )
-            })}
-          </div>
-        </div>
-      </section>
-
-      {/* How It Works */}
-      <section id="cara-kerja" className="py-24 px-4 sm:px-6 lg:px-8 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-teal-600 font-semibold text-sm uppercase tracking-wider mb-3">Cara Kerja</p>
-            <h2 className="text-4xl font-bold mb-4 text-gray-900">3 Langkah Mulai</h2>
-            <p className="text-lg text-gray-500">Setup dalam hitungan menit, bukan hari</p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 relative">
-            <div className="hidden md:block absolute top-8 left-1/3 right-1/3 h-0.5 bg-teal-100"></div>
-            {[
-              { num: '1', title: 'Connect WhatsApp', desc: 'Hubungkan nomor WhatsApp bisnis Anda dalam hitungan menit. Tidak perlu coding.' },
-              { num: '2', title: 'Setup AI Assistant', desc: 'Train AI dengan info produk & tone komunikasi unik bisnis Anda.' },
-              { num: '3', title: 'Start Automating', desc: 'Mulai auto-respond dan lihat closing rate naik hingga 60%.' },
-            ].map((step, i) => (
-              <div key={i} className="text-center relative">
-                <div className="w-16 h-16 bg-teal-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mx-auto mb-6 shadow-lg shadow-teal-200">
-                  {step.num}
-                </div>
-                <h3 className="text-xl font-bold mb-3 text-gray-900">{step.title}</h3>
-                <p className="text-gray-500 leading-relaxed">{step.desc}</p>
+                <h3 style={{ fontSize: 16, fontWeight: 600, margin: '0 0 8px' }}>{title}</h3>
+                <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, margin: 0 }}>{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <p className="text-teal-600 font-semibold text-sm uppercase tracking-wider mb-3">Harga</p>
-            <h2 className="text-4xl font-bold mb-4 text-gray-900">Transparan, Tanpa Biaya Tersembunyi</h2>
-            <p className="text-lg text-gray-500">Mulai gratis, upgrade saat bisnis berkembang</p>
+      {/* FITUR */}
+      <section id="fitur" style={{ padding: '80px 24px', background: 'white' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 56 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#1D9E75', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Fitur Utama</p>
+            <h2 style={{ fontSize: 34, fontWeight: 700, margin: 0 }}>Bukan chatbot biasa. Ini mesin closing.</h2>
           </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-start">
-            <div className="p-8 rounded-2xl border border-gray-200 bg-white">
-              <h3 className="text-xl font-bold mb-1 text-gray-900">Starter</h3>
-              <p className="text-gray-500 text-sm mb-6">Untuk testing & bisnis kecil</p>
-              <div className="text-5xl font-bold mb-1 text-gray-900">Rp 0</div>
-              <p className="text-gray-400 text-sm mb-8">/bulan</p>
-              <ul className="space-y-3 mb-8">
-                {['1 chat conversation', 'AI responses terbatas', 'Basic dashboard', 'Community support'].map((f, i) => (
-                  <li key={i} className="flex gap-3 text-sm text-gray-600">
-                    <CheckCircle className="w-4 h-4 text-teal-500 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/auth/sign-up">
-                <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:border-teal-600 hover:text-teal-600">
-                  Mulai Gratis
-                </Button>
-              </Link>
-            </div>
-
-            <div className="p-8 rounded-2xl border-2 border-teal-600 bg-white relative shadow-xl shadow-teal-100 md:-mt-4">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-teal-600 text-white px-4 py-1.5 rounded-full text-xs font-semibold">
-                Paling Populer
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+            {features.map(({ icon: Icon, title, desc }) => (
+              <div key={title} style={{ border: '0.5px solid #e5e7eb', borderRadius: 12, padding: 24, transition: 'border-color 0.2s' }}
+                onMouseEnter={e => (e.currentTarget.style.borderColor = '#1D9E75')}
+                onMouseLeave={e => (e.currentTarget.style.borderColor = '#e5e7eb')}>
+                <div style={{ width: 40, height: 40, borderRadius: 10, background: '#E1F5EE', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 14 }}>
+                  <Icon size={20} color="#0F6E56" />
+                </div>
+                <h3 style={{ fontSize: 15, fontWeight: 600, margin: '0 0 8px' }}>{title}</h3>
+                <p style={{ fontSize: 13, color: '#6b7280', lineHeight: 1.6, margin: 0 }}>{desc}</p>
               </div>
-              <h3 className="text-xl font-bold mb-1 text-gray-900">Growth</h3>
-              <p className="text-gray-500 text-sm mb-6">Untuk bisnis yang scaling</p>
-              <div className="text-5xl font-bold mb-1 text-gray-900">Rp 299K</div>
-              <p className="text-gray-400 text-sm mb-8">/bulan</p>
-              <ul className="space-y-3 mb-8">
-                {['10 chat conversations', 'Unlimited AI responses', 'Advanced analytics', 'Email support'].map((f, i) => (
-                  <li key={i} className="flex gap-3 text-sm text-gray-600">
-                    <CheckCircle className="w-4 h-4 text-teal-500 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Link href="/auth/sign-up">
-                <Button className="w-full bg-teal-600 hover:bg-teal-700 text-white">
-                  Upgrade ke Growth
-                </Button>
-              </Link>
-            </div>
-
-            <div className="p-8 rounded-2xl border border-gray-200 bg-white">
-              <h3 className="text-xl font-bold mb-1 text-gray-900">Enterprise</h3>
-              <p className="text-gray-500 text-sm mb-6">Custom solution</p>
-              <div className="text-5xl font-bold mb-1 text-gray-900">Custom</div>
-              <p className="text-gray-400 text-sm mb-8">/bulan</p>
-              <ul className="space-y-3 mb-8">
-                {['Unlimited everything', 'Custom integrations', 'Dedicated support', 'SLA guarantee'].map((f, i) => (
-                  <li key={i} className="flex gap-3 text-sm text-gray-600">
-                    <CheckCircle className="w-4 h-4 text-teal-500 flex-shrink-0 mt-0.5" />
-                    {f}
-                  </li>
-                ))}
-              </ul>
-              <Button variant="outline" className="w-full border-gray-300 text-gray-700 hover:border-teal-600 hover:text-teal-600">
-                Hubungi Sales
-              </Button>
-            </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* CTA Section */}
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-teal-600">
-        <div className="max-w-3xl mx-auto text-center">
-          <h2 className="text-4xl font-bold mb-4 text-white">Siap Scale Sales Anda?</h2>
-          <p className="text-xl mb-10 text-teal-100">
-            Bergabung dengan 500+ bisnis yang sudah meningkatkan closing rate mereka.
-          </p>
-          <form onSubmit={handleSubmit} className="flex gap-3 justify-center flex-wrap max-w-md mx-auto">
-            <input
-              type="email"
-              placeholder="Email bisnis Anda"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="flex-1 px-4 py-3 rounded-xl bg-white/20 border border-white/30 text-white placeholder:text-white/60 focus:outline-none focus:ring-2 focus:ring-white/50 min-w-0"
-              required
-            />
-            <Button type="submit" className="bg-white text-teal-600 hover:bg-teal-50 font-semibold px-6">
-              Coba Sekarang
-            </Button>
-          </form>
-          {submitted && (
-            <p className="mt-4 text-sm text-teal-100">✓ Terima kasih! Cek email Anda untuk langkah selanjutnya.</p>
-          )}
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="border-t border-gray-100 bg-white py-12">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
-            <div>
-              <Image
-                src="/websensial-logo-teal.png"
-                alt="Websensial"
-                width={140}
-                height={36}
-                className="h-8 w-auto mb-4"
-              />
-              <p className="text-sm text-gray-500 leading-relaxed">
-                AI Sales Automation untuk WhatsApp Business Indonesia.
-              </p>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-gray-900 text-sm">Produk</h4>
-              <ul className="space-y-2 text-sm text-gray-500">
-                {['Fitur', 'Harga', 'Dokumentasi'].map((l) => (
-                  <li key={l}><a href="#" className="hover:text-teal-600 transition">{l}</a></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-gray-900 text-sm">Perusahaan</h4>
-              <ul className="space-y-2 text-sm text-gray-500">
-                {['Tentang Kami', 'Blog', 'Kontak'].map((l) => (
-                  <li key={l}><a href="#" className="hover:text-teal-600 transition">{l}</a></li>
-                ))}
-              </ul>
-            </div>
-            <div>
-              <h4 className="font-semibold mb-4 text-gray-900 text-sm">Legal</h4>
-              <ul className="space-y-2 text-sm text-gray-500">
-                {['Privasi', 'Syarat & Ketentuan'].map((l) => (
-                  <li key={l}><a href="#" className="hover:text-teal-600 transition">{l}</a></li>
-                ))}
-              </ul>
-            </div>
-          </div>
-          <div className="border-t border-gray-100 pt-8 flex flex-col sm:flex-row justify-between items-center text-sm text-gray-400">
-            <p>&copy; 2025 Websensial. All rights reserved.</p>
-            <div className="flex gap-6 mt-4 sm:mt-0">
-              {['Twitter', 'LinkedIn', 'Instagram'].map((s) => (
-                <a key={s} href="#" className="hover:text-teal-600 transition">{s}</a>
+      {/* PRICING */}
+      <section id="harga" style={{ padding: '80px 24px', background: '#f9fafb' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 40 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#1D9E75', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>Harga</p>
+            <h2 style={{ fontSize: 34, fontWeight: 700, margin: '0 0 20px' }}>Pilih paket sesuai kebutuhan</h2>
+            <div style={{ display: 'inline-flex', background: 'white', border: '0.5px solid #e5e7eb', borderRadius: 10, padding: 4, gap: 4 }}>
+              {(['monthly', 'yearly'] as const).map(cycle => (
+                <button key={cycle} onClick={() => setBilling(cycle)}
+                  style={{ padding: '8px 20px', borderRadius: 7, border: 'none', fontSize: 13, fontWeight: 500, cursor: 'pointer', background: billing === cycle ? '#0F6E56' : 'transparent', color: billing === cycle ? 'white' : '#374151', transition: 'all 0.2s' }}>
+                  {cycle === 'monthly' ? 'Bulanan' : 'Tahunan'}{cycle === 'yearly' && <span style={{ fontSize: 11, marginLeft: 4, color: billing === 'yearly' ? '#9FE1CB' : '#1D9E75' }}>Hemat 50%</span>}
+                </button>
               ))}
             </div>
           </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 16 }}>
+            {plans.map(plan => (
+              <div key={plan.name} style={{ background: 'white', border: plan.badge ? '2px solid #1D9E75' : '0.5px solid #e5e7eb', borderRadius: 12, padding: 24, position: 'relative' }}>
+                {plan.badge && (
+                  <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', background: '#1D9E75', color: 'white', fontSize: 11, fontWeight: 600, padding: '3px 12px', borderRadius: 99, whiteSpace: 'nowrap' }}>
+                    {plan.badge}
+                  </div>
+                )}
+                <h3 style={{ fontSize: 16, fontWeight: 700, margin: '0 0 4px' }}>{plan.name}</h3>
+                <p style={{ fontSize: 12, color: '#6b7280', margin: '0 0 16px' }}>{plan.desc}</p>
+                <div style={{ marginBottom: 20 }}>
+                  <span style={{ fontSize: 28, fontWeight: 700 }}>
+                    {formatPrice(billing === 'monthly' ? plan.monthlyPrice : plan.yearlyPrice)}
+                  </span>
+                  {plan.monthlyPrice > 0 && <span style={{ fontSize: 13, color: '#9ca3af' }}>/bulan</span>}
+                </div>
+                <div style={{ marginBottom: 20 }}>
+                  {plan.features.map(f => (
+                    <div key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 8 }}>
+                      <CheckCircle size={14} color="#1D9E75" style={{ flexShrink: 0, marginTop: 2 }} />
+                      <span style={{ fontSize: 13, color: '#374151' }}>{f}</span>
+                    </div>
+                  ))}
+                </div>
+                <Link href="/auth/signup">
+                  <button style={{ width: '100%', padding: '10px 0', background: plan.badge ? '#0F6E56' : 'white', color: plan.badge ? 'white' : '#0F6E56', border: `1px solid ${plan.badge ? '#0F6E56' : '#1D9E75'}`, borderRadius: 8, fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                    {plan.monthlyPrice === 0 ? 'Mulai Trial Gratis' : `Pilih ${plan.name}`}
+                  </button>
+                </Link>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ */}
+      <section id="faq" style={{ padding: '80px 24px', background: 'white' }}>
+        <div style={{ maxWidth: 680, margin: '0 auto' }}>
+          <div style={{ textAlign: 'center', marginBottom: 48 }}>
+            <p style={{ fontSize: 13, fontWeight: 600, color: '#1D9E75', textTransform: 'uppercase', letterSpacing: 1, marginBottom: 8 }}>FAQ</p>
+            <h2 style={{ fontSize: 34, fontWeight: 700, margin: 0 }}>Pertanyaan yang sering muncul</h2>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {faqs.map((faq, i) => (
+              <div key={i} style={{ border: '0.5px solid #e5e7eb', borderRadius: 10, overflow: 'hidden' }}>
+                <button onClick={() => setOpenFaq(openFaq === i ? null : i)}
+                  style={{ width: '100%', padding: '16px 20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'white', border: 'none', cursor: 'pointer', textAlign: 'left' }}>
+                  <span style={{ fontSize: 14, fontWeight: 500, color: '#111' }}>{faq.q}</span>
+                  <ChevronDown size={16} color="#6b7280" style={{ flexShrink: 0, transform: openFaq === i ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }} />
+                </button>
+                {openFaq === i && (
+                  <div style={{ padding: '0 20px 16px', fontSize: 14, color: '#6b7280', lineHeight: 1.7 }}>
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* CTA FINAL */}
+      <section style={{ background: '#020617', padding: '80px 24px', textAlign: 'center' }}>
+        <div style={{ maxWidth: 600, margin: '0 auto' }}>
+          <h2 style={{ fontSize: 36, fontWeight: 700, color: 'white', margin: '0 0 16px' }}>
+            Jangan biarkan chat WhatsApp cuma jadi obrolan
+          </h2>
+          <p style={{ fontSize: 16, color: '#94a3b8', margin: '0 0 32px', lineHeight: 1.7 }}>
+            Mulai trial gratis, hubungkan WhatsApp, isi data bisnis, dan biarkan AI handle chat sampai closing.
+          </p>
+          <Link href="/auth/signup">
+            <button style={{ padding: '14px 32px', background: '#1D9E75', border: 'none', borderRadius: 10, fontSize: 15, fontWeight: 600, cursor: 'pointer', color: 'white', display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              Mulai Trial Gratis <ArrowRight size={16} />
+            </button>
+          </Link>
+        </div>
+      </section>
+
+      {/* FOOTER */}
+      <footer style={{ background: '#0a0f1a', padding: '40px 24px', borderTop: '0.5px solid #1e293b' }}>
+        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 16 }}>
+          <div>
+            <span style={{ fontSize: 16, fontWeight: 700, color: '#1D9E75' }}>Websensial</span>
+            <p style={{ fontSize: 12, color: '#475569', margin: '4px 0 0' }}>AI Sales Agent WhatsApp untuk bisnis Indonesia</p>
+          </div>
+          <div style={{ display: 'flex', gap: 24 }}>
+            {['Fitur', 'Harga', 'FAQ'].map(item => (
+              <a key={item} href={`#${item.toLowerCase()}`} style={{ fontSize: 13, color: '#64748b', textDecoration: 'none' }}>{item}</a>
+            ))}
+            <Link href="/auth/login" style={{ fontSize: 13, color: '#64748b', textDecoration: 'none' }}>Login</Link>
+          </div>
+          <p style={{ fontSize: 12, color: '#334155', margin: 0 }}>© 2026 Websensial. All rights reserved.</p>
         </div>
       </footer>
     </div>

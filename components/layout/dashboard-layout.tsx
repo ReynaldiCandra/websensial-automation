@@ -4,7 +4,6 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard,
@@ -17,20 +16,24 @@ import {
   X,
   Package,
   BarChart3,
-  MessageSquare,
   Sparkles,
+  GitMerge,
+  CreditCard,
+  CheckSquare,
 } from 'lucide-react'
 
 const navigationItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
   { icon: MessageCircle, label: 'Chat', href: '/dashboard/chat' },
-  { icon: MessageSquare, label: 'Chats', href: '/dashboard/chats' },
   { icon: Sparkles, label: 'AI Training', href: '/dashboard/ai-training' },
   { icon: Users, label: 'Leads', href: '/dashboard/leads' },
+  { icon: GitMerge, label: 'Pipeline', href: '/dashboard/pipeline' },
   { icon: FileText, label: 'Quotations', href: '/dashboard/quotations' },
   { icon: FileText, label: 'Invoices', href: '/dashboard/invoices' },
+  { icon: CheckSquare, label: 'Bukti Bayar', href: '/dashboard/payment-proof' },
   { icon: Package, label: 'Products', href: '/dashboard/products' },
   { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
+  { icon: CreditCard, label: 'Credits', href: '/dashboard/credits' },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ]
 
@@ -47,13 +50,11 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
       <aside
         className={`${
           isSidebarOpen ? 'w-60' : 'w-0'
         } bg-white border-r border-gray-100 transition-all duration-300 overflow-hidden flex flex-col flex-shrink-0`}
       >
-        {/* Logo */}
         <div className="px-5 py-5 border-b border-gray-100">
           <Image
             src="/websensial-logo-teal.png"
@@ -66,7 +67,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <p className="text-xs text-gray-400 mt-1 font-medium">AI Sales Automation</p>
         </div>
 
-        {/* Navigation */}
         <nav className="flex-1 overflow-y-auto p-3 space-y-0.5">
           {navigationItems.map((item) => {
             const Icon = item.icon
@@ -89,7 +89,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           })}
         </nav>
 
-        {/* Logout */}
         <div className="p-3 border-t border-gray-100">
           <button
             onClick={handleLogout}
@@ -101,9 +100,7 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content */}
       <div className="flex-1 flex flex-col overflow-hidden min-w-0">
-        {/* Top Header */}
         <header className="bg-white border-b border-gray-100 px-5 py-3.5 flex items-center justify-between flex-shrink-0">
           <button
             onClick={() => setIsSidebarOpen(!isSidebarOpen)}
@@ -123,7 +120,6 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Content */}
         <main className="flex-1 overflow-auto">
           {children}
         </main>
