@@ -63,9 +63,9 @@ export default function SignUpPage() {
           <Image
             src="/websensial-logo-tech.png"
             alt="Websensial"
-            width={200}
-            height={60}
-            className="h-14 w-auto mx-auto mb-12"
+            width={240}
+            height={64}
+            className="h-16 w-auto object-contain mx-auto"
           />
           <h2 className="text-3xl font-bold text-white mb-4">
             Mulai gratis hari ini
@@ -95,10 +95,10 @@ export default function SignUpPage() {
           <div className="lg:hidden mb-8 text-center">
             <Image
               src="/websensial-logo-teal.png"
-              alt="Websensial"
-              width={160}
-              height={44}
-              className="h-10 w-auto mx-auto"
+            alt="Websensial"
+            width={220}
+            height={60}
+            className="h-14 w-auto object-contain mx-auto"
             />
           </div>
 

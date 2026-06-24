@@ -56,9 +56,9 @@ export function DashboardLayout({ children }: { children: React.ReactNode }) {
           <Image
             src="/websensial-logo-teal.png"
             alt="Websensial"
-            width={140}
-            height={36}
-            className="h-8 w-auto"
+            width={180}
+            height={48}
+            className="h-12 w-auto object-contain"
             priority
           />
           <p className="text-xs text-gray-400 mt-1 font-medium">AI Sales Automation</p>
