@@ -6,6 +6,11 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
+  serverExternalPackages: [
+    '@whiskeysockets/baileys',
+    'pino',
+    'qrcode',
+  ],
 }
 
 export default nextConfig

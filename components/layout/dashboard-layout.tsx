@@ -18,12 +18,14 @@ import {
   Package,
   BarChart3,
   MessageSquare,
+  Sparkles,
 } from 'lucide-react'
 
 const navigationItems = [
   { icon: LayoutDashboard, label: 'Dashboard', href: '/dashboard' },
   { icon: MessageCircle, label: 'Chat', href: '/dashboard/chat' },
   { icon: MessageSquare, label: 'Chats', href: '/dashboard/chats' },
+  { icon: Sparkles, label: 'AI Training', href: '/dashboard/ai-training' },
   { icon: Users, label: 'Leads', href: '/dashboard/leads' },
   { icon: FileText, label: 'Quotations', href: '/dashboard/quotations' },
   { icon: FileText, label: 'Invoices', href: '/dashboard/invoices' },
