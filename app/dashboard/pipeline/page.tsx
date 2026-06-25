@@ -43,7 +43,7 @@ function initials(name: string) {
 }
 
 function timeSince(dateStr: string) {
-  const diff = Date.now() w Date(dateStr).getTime()
+  const diff = Date.now() - new Date(dateStr).getTime()
   const days = Math.floor(diff / 86400000)
   if (days === 0) return 'Hari ini'
   if (days === 1) return '1 hari lalu'
