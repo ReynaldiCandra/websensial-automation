@@ -6,17 +6,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Groq from 'groq-sdk'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+// WAJIB ADA AGAR TIDAK DI-BUILD OLEH VERCEL
+export const dynamic = 'force-dynamic';
 
 // ─── Detect language from text ────────────────────────────────
 function detectLanguage(text: string): string {
   const lower = text.toLowerCase()
-  // Simple heuristic — extend as needed
   if (/\b(halo|aku|kamu|tolong|berapa|mau|bisa|dong|kak|nih|yuk)\b/.test(lower)) return 'id'
   if (/\b(hello|please|price|want|can|how|much|need)\b/.test(lower)) return 'en'
   if (/\b(你好|价格|多少|需要)\b/.test(text)) return 'zh'
@@ -70,6 +65,13 @@ ${faqList}
 }
 
 export async function POST(req: NextRequest) {
+  // 1. PINDAHKAN INISIALISASI KE SINI (Di DALAM fungsi POST)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+
   try {
     const body = await req.json()
 
@@ -92,8 +94,7 @@ export async function POST(req: NextRequest) {
     // Normalize phone number
     const phone = from.replace('@s.whatsapp.net', '').replace(/\D/g, '')
 
-    // Find workspace by connected phone (waha_sessions table or similar)
-    // Adjust this query based on how you store WA sessions
+    // Find workspace by connected phone
     const { data: session } = await supabase
       .from('waha_sessions')
       .select('workspace_id')
