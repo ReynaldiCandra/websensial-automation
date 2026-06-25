@@ -1,47 +1,206 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+// app/api/reminder/route.ts
+// Reminder Automation — follow-up otomatis untuk invoice pending & inactive chats
+// Trigger via cron job: POST /api/reminder dengan header Authorization
 
-function createSupabaseServer() {
-  const cookieStore = cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (n) => cookieStore.get(n)?.value } }
-  )
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
+import Groq from 'groq-sdk'
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+
+async function sendWhatsApp(phone: string, message: string) {
+  try {
+    await fetch(`${process.env.WAHA_API_URL}/api/sendText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chatId: `${phone}@s.whatsapp.net`,
+        text: message,
+        session: process.env.WAHA_SESSION ?? 'default',
+      }),
+    })
+    return true
+  } catch (_) {
+    return false
+  }
+}
+
+async function generateReminderMessage(
+  type: 'invoice' | 'inactive',
+  context: { customerName: string; businessName: string; invoiceId?: string; daysSince?: number; tone?: string }
+): Promise<string> {
+  const toneHint = context.tone ?? 'ramah dan sopan'
+
+  const prompt = type === 'invoice'
+    ? `Buat pesan reminder pembayaran invoice WhatsApp untuk ${context.customerName}. 
+       Bisnis: ${context.businessName}. Invoice: ${context.invoiceId}.
+       Tone: ${toneHint}. Maksimal 3 kalimat, natural, tidak terkesan spam.`
+    : `Buat pesan follow-up untuk lead ${context.customerName} yang tidak membalas selama ${context.daysSince} hari.
+       Bisnis: ${context.businessName}. Tone: ${toneHint}. Singkat, friendly, ajak bicara lagi.`
+
+  try {
+    const completion = await groq.chat.completions.create({
+      model: 'llama-3.1-8b-instant',
+      temperature: 0.7,
+      max_tokens: 150,
+      messages: [
+        { role: 'system', content: 'Kamu menulis pesan WhatsApp reminder bisnis yang natural dan tidak spam.' },
+        { role: 'user', content: prompt },
+      ],
+    })
+    return completion.choices[0]?.message?.content?.trim() ?? ''
+  } catch (_) {
+    if (type === 'invoice') {
+      return `Halo ${context.customerName}, apakah ada pertanyaan mengenai invoice? Kami siap membantu 😊`
+    }
+    return `Halo ${context.customerName}, ada yang bisa kami bantu? Jangan ragu untuk bertanya!`
+  }
 }
 
 export async function POST(req: NextRequest) {
-  const supabase = createSupabaseServer()
-  const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
-
-  const { data: invoices } = await supabase
-    .from('invoices')
-    .select('*, leads(name, phone)')
-    .eq('status', 'pending')
-    .lt('created_at', cutoff)
-    .lt('reminder_count', 3)
-
-  if (!invoices || invoices.length === 0) {
-    return NextResponse.json({ sent: 0, message: 'No pending invoices' })
+  // Security: require cron secret
+  const auth = req.headers.get('authorization')
+  if (auth !== `Bearer ${process.env.CRON_SECRET}`) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  let sent = 0
-  for (const invoice of invoices) {
-    const lead = invoice.leads as any
-    if (!lead?.phone) continue
+  const results = { invoiceReminders: 0, inactiveFollowups: 0, errors: 0 }
 
-    const message = `Halo ${lead.name}, invoice ${invoice.invoice_number} senilai Rp${Number(invoice.total_amount).toLocaleString('id-ID')} masih menunggu pembayaran. ${invoice.payment_url ? `Silakan bayar di: ${invoice.payment_url}` : 'Mohon segera lakukan pembayaran.'}`
+  try {
+    // ── 1. Invoice Payment Reminders ──────────────────────────
+    // Find invoices pending > 24h and < 3 reminders sent
+    const cutoff24h  = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+    const cutoff72h  = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString()
 
-    console.log(`[Reminder] Sending to ${lead.phone}: ${message}`)
+    const { data: pendingInvoices } = await supabase
+      .from('invoices')
+      .select('*, leads(name, phone, workspace_id)')
+      .eq('status', 'pending')
+      .lt('created_at', cutoff24h)
+      .lt('reminder_count', 3)
 
-    await supabase.from('invoices').update({
-      reminder_count: (invoice.reminder_count || 0) + 1,
-      last_reminder_at: new Date().toISOString(),
-    }).eq('id', invoice.id)
+    for (const invoice of pendingInvoices ?? []) {
+      const lead = invoice.leads as { name: string; phone: string; workspace_id: string } | null
+      if (!lead?.phone) continue
 
-    sent++
+      // Get AI settings for this workspace
+      const { data: settings } = await supabase
+        .from('ai_settings')
+        .select('business_name, tone')
+        .eq('workspace_id', lead.workspace_id)
+        .single()
+
+      const message = await generateReminderMessage('invoice', {
+        customerName: lead.name,
+        businessName: settings?.business_name ?? 'kami',
+        invoiceId: invoice.id.slice(0, 8).toUpperCase(),
+        tone: settings?.tone,
+      })
+
+      if (!message) continue
+
+      const sent = await sendWhatsApp(lead.phone, message)
+
+      if (sent) {
+        // Update reminder count + log
+        await Promise.all([
+          supabase
+            .from('invoices')
+            .update({ reminder_count: (invoice.reminder_count ?? 0) + 1, last_reminder_at: new Date().toISOString() })
+            .eq('id', invoice.id),
+          supabase.from('messages').insert({
+            workspace_id: lead.workspace_id,
+            phone: lead.phone,
+            content: message,
+            sender_type: 'ai',
+          }),
+          supabase.from('reminder_logs').insert({
+            workspace_id: lead.workspace_id,
+            invoice_id: invoice.id,
+            phone: lead.phone,
+            message,
+            status: 'sent',
+          }),
+        ])
+        results.invoiceReminders++
+      }
+    }
+
+    // ── 2. Inactive Chat Follow-ups ───────────────────────────
+    // Leads that haven't responded in 48h and haven't been followed up in 48h
+    const { data: inactiveLeads } = await supabase
+      .from('leads')
+      .select('*, workspace_id')
+      .not('temperature', 'eq', 'cold')
+      .eq('is_escalated', false)
+      .lt('last_seen_at', cutoff72h)
+
+    for (const lead of inactiveLeads ?? []) {
+      if (!lead.phone) continue
+
+      // Check if we sent a followup in the last 48h
+      const { data: recentLog } = await supabase
+        .from('reminder_logs')
+        .select('id')
+        .eq('phone', lead.phone)
+        .eq('workspace_id', lead.workspace_id)
+        .gt('sent_at', cutoff72h)
+        .limit(1)
+
+      if (recentLog && recentLog.length > 0) continue // already followed up
+
+      const daysSince = Math.floor((Date.now() - new Date(lead.last_seen_at).getTime()) / (1000 * 60 * 60 * 24))
+
+      const { data: settings } = await supabase
+        .from('ai_settings')
+        .select('business_name, tone')
+        .eq('workspace_id', lead.workspace_id)
+        .single()
+
+      const message = await generateReminderMessage('inactive', {
+        customerName: lead.name ?? 'Kak',
+        businessName: settings?.business_name ?? 'kami',
+        daysSince,
+        tone: settings?.tone,
+      })
+
+      if (!message) continue
+
+      const sent = await sendWhatsApp(lead.phone, message)
+
+      if (sent) {
+        await Promise.all([
+          supabase.from('messages').insert({
+            workspace_id: lead.workspace_id,
+            phone: lead.phone,
+            lead_id: lead.id,
+            content: message,
+            sender_type: 'ai',
+          }),
+          supabase.from('reminder_logs').insert({
+            workspace_id: lead.workspace_id,
+            lead_id: lead.id,
+            phone: lead.phone,
+            message,
+            status: 'sent',
+          }),
+        ])
+        results.inactiveFollowups++
+      }
+    }
+  } catch (err) {
+    console.error('Reminder error:', err)
+    results.errors++
   }
 
-  return NextResponse.json({ sent, total: invoices.length })
+  return NextResponse.json({
+    success: true,
+    ...results,
+    timestamp: new Date().toISOString(),
+  })
 }

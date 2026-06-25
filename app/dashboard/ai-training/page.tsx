@@ -457,13 +457,13 @@ function AiTrainingContent() {
 
         const path = `${userId}/${Date.now()}-${file.name}`
         const { error: uploadError } = await supabase.storage
-          .from('ai-training-docs')
+          .from('ai_training_documents')
           .upload(path, file)
 
         let fileUrl: string | null = null
         if (!uploadError) {
           const { data: urlData } = supabase.storage
-            .from('ai-training-docs')
+            .from('ai_training_documents')
             .getPublicUrl(path)
           fileUrl = urlData.publicUrl
         }

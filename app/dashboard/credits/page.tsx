@@ -1,162 +1,230 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
+import { DashboardLayout } from '@/components/layout/dashboard-layout'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { createClient } from '@/lib/supabase/client'
-import { TrendingDown, TrendingUp, Zap, AlertTriangle, Plus, Gift } from 'lucide-react'
+import { Zap, Gift, TrendingUp, Clock } from 'lucide-react'
 
 interface CreditData {
-  total_credits: number
-  used_credits: number
   plan: string
-  reset_at: string
+  credits_used: number
+  credits_total: number
+  reset_date: string | null
 }
 
 interface Transaction {
   id: string
+  type: 'usage' | 'topup' | 'reset'
   amount: number
-  type: string
   description: string
   created_at: string
 }
 
+const PLAN_COLORS: Record<string, string> = {
+  Free: 'from-violet-600 to-violet-800',
+  Starter: 'from-blue-600 to-blue-800',
+  Growth: 'from-purple-600 to-indigo-700',
+  Business: 'from-rose-600 to-pink-700',
+  Scale: 'from-amber-500 to-orange-600',
+}
+
+const PLAN_CREDITS: Record<string, number> = {
+  Free: 100,
+  Starter: 2000,
+  Growth: 7500,
+  Business: 18000,
+  Scale: 50000,
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '—'
+  const d = new Date(dateStr)
+  if (isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' })
+}
+
 export default function CreditsPage() {
   const supabase = createClient()
-  const [credits, setCredits] = useState<CreditData | null>(null)
-  const [history, setHistory] = useState<Transaction[]>([])
-  const [loading, setLoading] = useState(true)
+  const [data, setData]           = useState<CreditData | null>(null)
+  const [transactions, setTx]     = useState<Transaction[]>([])
+  const [loading, setLoading]     = useState(true)
+  const [companyId, setCompanyId] = useState<string | null>(null)
 
-  useEffect(() => { fetchData() }, [])
-
-  async function fetchData() {
-    setLoading(true)
+  const getCompanyId = useCallback(async (): Promise<string | null> => {
+    if (companyId) return companyId
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    if (!user) return null
+    const { data } = await supabase.from('companies').select('id').eq('owner_id', user.id).single()
+    const id = data?.id ?? null
+    if (id) setCompanyId(id)
+    return id
+  }, [supabase, companyId])
 
-    const { data: creditData } = await supabase
-      .from('user_credits')
-      .select('*')
-      .eq('user_id', user.id)
+  const loadData = useCallback(async () => {
+    const cid = await getCompanyId()
+    if (!cid) return
+
+    // Load subscription/credits
+    const { data: sub } = await supabase
+      .from('subscriptions')
+      .select('plan, credits_used, credits_total, reset_date')
+      .eq('company_id', cid)
       .single()
 
+    if (sub) {
+      setData({
+        plan: sub.plan ?? 'Free',
+        credits_used: sub.credits_used ?? 0,
+        credits_total: sub.credits_total ?? PLAN_CREDITS[sub.plan ?? 'Free'] ?? 100,
+        reset_date: sub.reset_date ?? null,
+      })
+    } else {
+      // Fallback: coba tabel credits
+      const { data: credits } = await supabase
+        .from('credits')
+        .select('plan, credits_used, credits_total, reset_date')
+        .eq('company_id', cid)
+        .single()
+
+      setData({
+        plan: credits?.plan ?? 'Free',
+        credits_used: credits?.credits_used ?? 0,
+        credits_total: credits?.credits_total ?? PLAN_CREDITS[credits?.plan ?? 'Free'] ?? 100,
+        reset_date: credits?.reset_date ?? null,
+      })
+    }
+
+    // Load transaction history
     const { data: txData } = await supabase
       .from('credit_transactions')
       .select('*')
-      .eq('user_id', user.id)
+      .eq('company_id', cid)
       .order('created_at', { ascending: false })
       .limit(20)
+    if (txData) setTx(txData as Transaction[])
 
-    if (creditData) setCredits(creditData)
-    if (txData) setHistory(txData)
     setLoading(false)
+  }, [supabase, getCompanyId])
+
+  useEffect(() => { void loadData() }, [loadData])
+
+  const used         = data?.credits_used ?? 0
+  const total        = data?.credits_total ?? 100
+  const remaining    = Math.max(0, total - used)
+  const percent      = total > 0 ? Math.min(100, Math.round((used / total) * 100)) : 0
+  const planGradient = PLAN_COLORS[data?.plan ?? 'Free'] ?? PLAN_COLORS.Free
+  const almostOut    = percent >= 80
+
+  if (loading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6 flex items-center justify-center h-64">
+          <p className="text-muted-foreground">Memuat data kredit...</p>
+        </div>
+      </DashboardLayout>
+    )
   }
 
-  if (loading) return <div style={{ padding: 24, textAlign: 'center', color: '#64748B' }}>Loading...</div>
-
-  const remaining = (credits?.total_credits || 0) - (credits?.used_credits || 0)
-  const percentage = credits?.total_credits ? ((remaining / credits.total_credits) * 100) : 0
-  const resetDate = new Date(credits?.reset_at || '')
-
   return (
-    <div style={{ padding: '24px', background: '#0D0D12', minHeight: '100vh' }}>
-      <div style={{ marginBottom: 24 }}>
-        <h1 style={{ fontSize: 28, fontWeight: 700, color: '#E2E8F0', margin: '0 0 8px' }}>
-          Kredit Bulanan
-        </h1>
-        <p style={{ color: '#64748B', fontSize: 14, margin: 0 }}>
-          Kelola dan monitor penggunaan kredit Anda
-        </p>
-      </div>
-
-      <div style={{ background: 'linear-gradient(135deg, #6C3BF5 0%, #4F1FD4 100%)', borderRadius: 16, padding: 32, marginBottom: 24, color: '#FFF' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-          <div>
-            <p style={{ fontSize: 13, opacity: 0.8, margin: 0, textTransform: 'uppercase' }}>Available Credits</p>
-            <p style={{ fontSize: 48, fontWeight: 700, margin: '8px 0 0' }}>
-              {remaining.toLocaleString()}
-            </p>
-          </div>
-          <Zap size={32} style={{ opacity: 0.8 }} />
+    <DashboardLayout>
+      <div className="p-6 max-w-3xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold flex items-center gap-2">
+            <Zap className="w-6 h-6" /> Kredit Bulanan
+          </h1>
+          <p className="text-muted-foreground text-sm mt-1">
+            Kelola dan monitor penggunaan kredit AI kamu
+          </p>
         </div>
 
-        <div style={{ marginBottom: 24 }}>
-          <div style={{ background: 'rgba(255,255,255,0.2)', height: 8, borderRadius: 4, overflow: 'hidden' }}>
-            <div style={{ background: '#FFF', height: '100%', width: `${percentage}%`, transition: 'width 0.3s' }} />
+        {/* Credit card */}
+        <div className={`rounded-xl bg-gradient-to-br ${planGradient} p-6 text-white`}>
+          <div className="flex items-center justify-between mb-6">
+            <p className="text-xs font-semibold tracking-widest opacity-80">AVAILABLE CREDITS</p>
+            <Zap className="w-5 h-5 opacity-70" />
           </div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginTop: 8, opacity: 0.8 }}>
-            <span>{(credits?.used_credits || 0).toLocaleString()} used</span>
-            <span>{(credits?.total_credits || 0).toLocaleString()} total</span>
+          <p className="text-5xl font-bold mb-6">{remaining.toLocaleString('id-ID')}</p>
+
+          {/* Progress bar */}
+          <div className="w-full bg-white/20 rounded-full h-2 mb-2">
+            <div
+              className="h-2 rounded-full bg-white transition-all"
+              style={{ width: `${percent}%` }}
+            />
           </div>
+          <div className="flex justify-between text-xs opacity-80 mb-5">
+            <span>{used.toLocaleString('id-ID')} terpakai</span>
+            <span>{total.toLocaleString('id-ID')} total</span>
+          </div>
+
+          <div className="flex items-center gap-6 text-xs">
+            <div>
+              <p className="opacity-70">PLAN</p>
+              <p className="font-semibold mt-0.5">{data?.plan ?? 'Free'}</p>
+            </div>
+            <div>
+              <p className="opacity-70">RESET</p>
+              <p className="font-semibold mt-0.5">{formatDate(data?.reset_date)}</p>
+            </div>
+          </div>
+
+          {almostOut && (
+            <div className="mt-4 flex items-center gap-2 bg-white/10 rounded-lg px-3 py-2">
+              <Zap className="w-4 h-4" />
+              <p className="text-xs">Kredit hampir habis. Upgrade plan untuk kredit lebih banyak.</p>
+            </div>
+          )}
         </div>
 
-        <div style={{ display: 'flex', gap: 16, paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
-          <div>
-            <p style={{ fontSize: 11, opacity: 0.7, margin: 0, textTransform: 'uppercase' }}>Plan</p>
-            <p style={{ fontSize: 16, fontWeight: 600, margin: '4px 0 0' }}>{credits?.plan || 'Free'}</p>
-          </div>
-          <div>
-            <p style={{ fontSize: 11, opacity: 0.7, margin: 0, textTransform: 'uppercase' }}>Reset Date</p>
-            <p style={{ fontSize: 16, fontWeight: 600, margin: '4px 0 0' }}>
-              {resetDate.toLocaleDateString('id-ID', { month: 'short', day: 'numeric' })}
-            </p>
-          </div>
+        {/* Actions */}
+        <div className="grid grid-cols-2 gap-3">
+          <Button className="w-full" size="lg">
+            <TrendingUp className="w-4 h-4 mr-2" /> Upgrade Plan
+          </Button>
+          <Button variant="outline" className="w-full" size="lg">
+            <Gift className="w-4 h-4 mr-2" /> Redeem Voucher
+          </Button>
         </div>
 
-        {percentage < 20 && (
-          <div style={{ marginTop: 16, padding: 12, background: 'rgba(255,255,255,0.1)', borderRadius: 8, display: 'flex', alignItems: 'center', gap: 8, fontSize: 13 }}>
-            <AlertTriangle size={16} />
-            Kredit Anda hampir habis. Upgrade plan untuk mendapatkan kredit lebih banyak.
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginBottom: 24 }}>
-        <button style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 24px', background: '#6C3BF5', border: 'none', borderRadius: 8, color: '#FFF', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => (e.currentTarget as any).style.background = '#7C4BF5'} onMouseLeave={e => (e.currentTarget as any).style.background = '#6C3BF5'}>
-          <Plus size={18} /> Upgrade Plan
-        </button>
-        <button style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, padding: '12px 24px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, color: '#E2E8F0', fontWeight: 600, cursor: 'pointer', transition: 'all 0.2s' }} onMouseEnter={e => { (e.currentTarget as any).style.background = 'rgba(255,255,255,0.05)'; (e.currentTarget as any).style.borderColor = '#6C3BF5' }} onMouseLeave={e => { (e.currentTarget as any).style.background = 'transparent'; (e.currentTarget as any).style.borderColor = 'rgba(255,255,255,0.1)' }}>
-          <Gift size={18} /> Redeem Voucher
-        </button>
-      </div>
-
-      <div style={{ background: '#111118', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, overflow: 'hidden' }}>
-        <div style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <h2 style={{ fontSize: 16, fontWeight: 700, color: '#E2E8F0', margin: 0 }}>Transaction History</h2>
-        </div>
-
-        {history.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: '#64748B' }}>
-            <p style={{ margin: 0 }}>Belum ada history transaksi</p>
-          </div>
-        ) : (
-          <div>
-            {history.map(tx => (
-              <div key={tx.id} style={{ padding: '16px 24px', borderBottom: '1px solid rgba(255,255,255,0.03)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 8,
-                    background: tx.type === 'add' ? '#10B98133' : '#EF444433',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    color: tx.type === 'add' ? '#10B981' : '#EF4444'
-                  }}>
-                    {tx.type === 'add' ? <Plus size={20} /> : <TrendingDown size={20} />}
+        {/* Transaction history */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="w-4 h-4" /> Riwayat Transaksi
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {transactions.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-6">Belum ada riwayat transaksi</p>
+            ) : (
+              <div className="divide-y divide-border">
+                {transactions.map(tx => (
+                  <div key={tx.id} className="flex items-center justify-between py-3">
+                    <div>
+                      <p className="text-sm font-medium">{tx.description}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {formatDate(tx.created_at)}
+                      </p>
+                    </div>
+                    <Badge
+                      variant="outline"
+                      className={tx.type === 'usage'
+                        ? 'text-red-400 border-red-400/30'
+                        : 'text-green-400 border-green-400/30'
+                      }
+                    >
+                      {tx.type === 'usage' ? '-' : '+'}{Math.abs(tx.amount).toLocaleString('id-ID')}
+                    </Badge>
                   </div>
-                  <div>
-                    <p style={{ fontSize: 13, fontWeight: 600, color: '#E2E8F0', margin: 0 }}>
-                      {tx.description}
-                    </p>
-                    <p style={{ fontSize: 12, color: '#64748B', margin: '4px 0 0' }}>
-                      {new Date(tx.created_at).toLocaleDateString('id-ID')}
-                    </p>
-                  </div>
-                </div>
-                <div style={{ fontSize: 14, fontWeight: 700, color: tx.type === 'add' ? '#10B981' : '#EF4444' }}>
-                  {tx.type === 'add' ? '+' : '-'}{tx.amount}
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
-        )}
+            )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </DashboardLayout>
   )
 }

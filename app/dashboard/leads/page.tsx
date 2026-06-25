@@ -1,258 +1,262 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { createClient } from '@/lib/supabase/client'
 import {
-  Plus,
-  Search,
-  Filter,
-  Phone,
-  Mail,
-  TrendingUp,
-  Clock,
-  User,
+  Search, Flame, Thermometer, Snowflake, TrendingUp,
+  RefreshCw, UserCheck, BarChart2, MessageCircle,
 } from 'lucide-react'
+import Link from 'next/link'
 
-// Mock leads data
-const mockLeads = [
-  {
-    id: 1,
-    name: 'Budi Santoso',
-    phone: '+62 812-3456-7890',
-    email: 'budi@example.com',
-    company: 'PT Maju Jaya',
-    status: 'interested',
-    temperature: 'hot',
-    score: 85,
-    lastInteraction: '2 jam lalu',
-  },
-  {
-    id: 2,
-    name: 'Siti Nurhaliza',
-    phone: '+62 813-2456-7890',
-    email: 'siti@example.com',
-    company: 'CV Berkah',
-    status: 'contacted',
-    temperature: 'warm',
-    score: 65,
-    lastInteraction: '4 jam lalu',
-  },
-  {
-    id: 3,
-    name: 'Joko Subroto',
-    phone: '+62 811-2456-7890',
-    email: 'joko@example.com',
-    company: 'Toko Elektronik',
-    status: 'new',
-    temperature: 'cold',
-    score: 40,
-    lastInteraction: 'Kemarin',
-  },
-]
+interface Lead {
+  id: string
+  name: string
+  phone: string
+  email?: string
+  company?: string
+  status: string
+  temperature: 'hot' | 'warm' | 'cold'
+  score: number
+  last_message?: string
+  last_seen_at?: string
+  is_escalated: boolean
+  created_at: string
+}
+
+const tempIcon = (t: string) => {
+  if (t === 'hot')  return <Flame className="w-4 h-4 text-red-400" />
+  if (t === 'warm') return <Thermometer className="w-4 h-4 text-yellow-400" />
+  return <Snowflake className="w-4 h-4 text-blue-400" />
+}
+
+const tempBadge = (t: string) => {
+  if (t === 'hot')  return 'bg-red-500/10 text-red-400 border-red-500/30'
+  if (t === 'warm') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
+  return 'bg-blue-500/10 text-blue-400 border-blue-500/30'
+}
+
+const scoreBar = (score: number) => (
+  <div className="flex items-center gap-2">
+    <div className="flex-1 bg-border rounded-full h-1.5 max-w-[80px]">
+      <div
+        className={`h-1.5 rounded-full ${score >= 70 ? 'bg-red-400' : score >= 40 ? 'bg-yellow-400' : 'bg-blue-400'}`}
+        style={{ width: `${score}%` }}
+      />
+    </div>
+    <span className="text-xs font-medium">{score}</span>
+  </div>
+)
 
 export default function LeadsPage() {
-  const [searchQuery, setSearchQuery] = useState('')
+  const supabase = createClient()
+  const [leads, setLeads]           = useState<Lead[]>([])
+  const [loading, setLoading]       = useState(true)
+  const [search, setSearch]         = useState('')
+  const [filter, setFilter]         = useState<'all' | 'hot' | 'warm' | 'cold' | 'escalated'>('all')
+  const [rescoring, setRescoring]   = useState<string | null>(null)
 
-  const getTemperatureBadgeVariant = (temp: string) => {
-    if (temp === 'hot') return 'default'
-    if (temp === 'warm') return 'secondary'
-    return 'outline'
+  const loadLeads = useCallback(async () => {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+    const { data } = await supabase
+      .from('leads')
+      .select('*')
+      .eq('workspace_id', user.id)
+      .order('score', { ascending: false })
+    if (data) setLeads(data as Lead[])
+    setLoading(false)
+  }, [supabase])
+
+  useEffect(() => { void loadLeads() }, [loadLeads])
+
+  // Re-score a single lead via AI
+  const rescore = async (lead: Lead) => {
+    setRescoring(lead.id)
+    try {
+      const res = await fetch('/api/ai/score-lead', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ leadId: lead.id, phone: lead.phone }),
+      })
+      const data = await res.json()
+      if (data.score !== undefined) {
+        setLeads(prev => prev.map(l =>
+          l.id === lead.id
+            ? { ...l, score: data.score, temperature: data.temperature }
+            : l
+        ))
+      }
+    } catch (_) { /* ignore */ }
+    setRescoring(null)
   }
 
-  const getStatusColor = (status: string) => {
-    if (status === 'interested') return 'text-green-500'
-    if (status === 'contacted') return 'text-blue-500'
-    return 'text-gray-500'
+  const filtered = leads
+    .filter(l => {
+      if (filter === 'hot')       return l.temperature === 'hot'
+      if (filter === 'warm')      return l.temperature === 'warm'
+      if (filter === 'cold')      return l.temperature === 'cold'
+      if (filter === 'escalated') return l.is_escalated
+      return true
+    })
+    .filter(l =>
+      !search ||
+      l.name?.toLowerCase().includes(search.toLowerCase()) ||
+      l.phone?.includes(search) ||
+      l.company?.toLowerCase().includes(search.toLowerCase())
+    )
+
+  const counts = {
+    hot: leads.filter(l => l.temperature === 'hot').length,
+    warm: leads.filter(l => l.temperature === 'warm').length,
+    cold: leads.filter(l => l.temperature === 'cold').length,
+    escalated: leads.filter(l => l.is_escalated).length,
   }
 
   return (
     <DashboardLayout>
-      <div className="p-8">
-        {/* Header */}
-        <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-foreground mb-2">Lead Management</h1>
-            <p className="text-muted-foreground">
-              Kelola dan track semua leads Anda
-            </p>
-          </div>
-          <Button className="bg-primary hover:bg-primary/90 gap-2">
-            <Plus className="w-4 h-4" />
-            Tambah Lead
-          </Button>
+      <div className="p-6 max-w-7xl mx-auto space-y-6">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground">Leads & Lead Scoring</h1>
+          <p className="text-muted-foreground text-sm mt-1">Semua prospek dari WhatsApp, dinilai otomatis oleh AI</p>
         </div>
 
-        {/* Search and Filter */}
-        <div className="mb-6 flex gap-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+        {/* Stats row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: 'Hot Leads', value: counts.hot, icon: <Flame className="w-5 h-5 text-red-400" />, color: 'text-red-400' },
+            { label: 'Warm Leads', value: counts.warm, icon: <Thermometer className="w-5 h-5 text-yellow-400" />, color: 'text-yellow-400' },
+            { label: 'Cold Leads', value: counts.cold, icon: <Snowflake className="w-5 h-5 text-blue-400" />, color: 'text-blue-400' },
+            { label: 'Eskalasi', value: counts.escalated, icon: <UserCheck className="w-5 h-5 text-orange-400" />, color: 'text-orange-400' },
+          ].map(stat => (
+            <Card key={stat.label} className="bg-card">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-muted-foreground">{stat.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${stat.color}`}>{stat.value}</p>
+                  </div>
+                  {stat.icon}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+
+        {/* Filters + Search */}
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Cari lead berdasarkan nama, email, atau nomor..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-background border-border"
+              placeholder="Cari nama, nomor, perusahaan..."
+              className="pl-9"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
             />
           </div>
-          <Button variant="outline" className="gap-2">
-            <Filter className="w-4 h-4" />
-            Filter
+          <div className="flex gap-1 flex-wrap">
+            {(['all', 'hot', 'warm', 'cold', 'escalated'] as const).map(f => (
+              <Button
+                key={f}
+                variant={filter === f ? 'default' : 'outline'}
+                size="sm"
+                onClick={() => setFilter(f)}
+                className="capitalize"
+              >
+                {f === 'all' ? 'Semua' : f === 'escalated' ? 'Eskalasi' : f}
+                {f !== 'all' && <span className="ml-1 text-xs">({counts[f as keyof typeof counts] ?? leads.length})</span>}
+              </Button>
+            ))}
+          </div>
+          <Button variant="outline" size="sm" onClick={() => void loadLeads()}>
+            <RefreshCw className="w-4 h-4 mr-1" /> Refresh
           </Button>
         </div>
 
-        {/* Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-foreground">
-                Total Leads
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-foreground">
-                {mockLeads.length}
-              </div>
-              <p className="text-xs text-muted-foreground mt-1">
-                +5 bulan ini
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-foreground">
-                Hot Leads
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-500">1</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Siap untuk closing
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-foreground">
-                Warm Leads
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-yellow-500">1</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                Follow-up diperlukan
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-card border-border">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-foreground">
-                Conversion Rate
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-500">33%</div>
-              <p className="text-xs text-muted-foreground mt-1">
-                +15% vs bulan lalu
-              </p>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Leads Table */}
-        <Card className="bg-card border-border">
-          <CardHeader>
-            <CardTitle>Daftar Leads</CardTitle>
-            <CardDescription>
-              {mockLeads.length} leads aktif
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
-                <TableHeader className="bg-muted/50">
-                  <TableRow className="border-border hover:bg-transparent">
-                    <TableHead className="text-foreground font-semibold">Nama</TableHead>
-                    <TableHead className="text-foreground font-semibold">Kontak</TableHead>
-                    <TableHead className="text-foreground font-semibold">Perusahaan</TableHead>
-                    <TableHead className="text-foreground font-semibold">Status</TableHead>
-                    <TableHead className="text-foreground font-semibold text-center">Score</TableHead>
-                    <TableHead className="text-foreground font-semibold">Interaksi Terakhir</TableHead>
-                    <TableHead className="text-foreground font-semibold text-right">Aksi</TableHead>
+        {/* Table */}
+        <Card>
+          <CardContent className="p-0">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nama</TableHead>
+                  <TableHead>Nomor WA</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>
+                    <div className="flex items-center gap-1"><BarChart2 className="w-4 h-4" /> Lead Score</div>
+                  </TableHead>
+                  <TableHead>Suhu</TableHead>
+                  <TableHead>Pesan Terakhir</TableHead>
+                  <TableHead>Aksi</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {loading && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Memuat lead...</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {mockLeads.map((lead) => (
-                    <TableRow
-                      key={lead.id}
-                      className="border-border hover:bg-accent/5 transition-colors"
-                    >
-                      <TableCell className="font-medium text-foreground">
-                        {lead.name}
-                      </TableCell>
-                      <TableCell>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Phone className="w-3 h-3" />
-                            {lead.phone}
-                          </div>
-                          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <Mail className="w-3 h-3" />
-                            {lead.email}
-                          </div>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {lead.company}
-                      </TableCell>
-                      <TableCell>
-                        <Badge
-                          variant={getTemperatureBadgeVariant(lead.temperature)}
-                        >
-                          {lead.temperature}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <div className="flex items-center justify-center gap-1">
-                          <TrendingUp className="w-3 h-3 text-primary" />
-                          <span className="font-semibold text-foreground">
-                            {lead.score}
-                          </span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        <div className="flex items-center gap-1">
-                          <Clock className="w-3 h-3" />
-                          {lead.lastInteraction}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
+                )}
+                {!loading && filtered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="text-center py-12 text-muted-foreground">Tidak ada lead ditemukan</TableCell>
+                  </TableRow>
+                )}
+                {filtered.map(lead => (
+                  <TableRow key={lead.id}>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium">{lead.name ?? '—'}</p>
+                        {lead.company && <p className="text-xs text-muted-foreground">{lead.company}</p>}
+                        {lead.is_escalated && (
+                          <span className="text-xs text-orange-400">⚡ Eskalasi</span>
+                        )}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">{lead.phone}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="capitalize text-xs">{lead.status ?? 'baru'}</Badge>
+                    </TableCell>
+                    <TableCell>{scoreBar(lead.score ?? 0)}</TableCell>
+                    <TableCell>
+                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded border ${tempBadge(lead.temperature)}`}>
+                        {tempIcon(lead.temperature)} {lead.temperature}
+                      </span>
+                    </TableCell>
+                    <TableCell className="max-w-[180px]">
+                      <p className="text-xs text-muted-foreground truncate">{lead.last_message ?? '—'}</p>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        <Link href={`/dashboard/chats?phone=${lead.phone}`}>
+                          <Button variant="ghost" size="sm">
+                            <MessageCircle className="w-4 h-4" />
+                          </Button>
+                        </Link>
                         <Button
                           variant="ghost"
                           size="sm"
-                          className="text-primary hover:text-primary/90"
+                          onClick={() => void rescore(lead)}
+                          disabled={rescoring === lead.id}
+                          title="Re-score AI"
                         >
-                          View
+                          {rescoring === lead.id
+                            ? <RefreshCw className="w-4 h-4 animate-spin" />
+                            : <TrendingUp className="w-4 h-4" />
+                          }
                         </Button>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
           </CardContent>
         </Card>
       </div>

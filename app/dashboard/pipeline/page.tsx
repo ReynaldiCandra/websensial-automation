@@ -1,4 +1,5 @@
 'use client'
+import { DashboardLayout } from '@/components/layout/dashboard-layout'
 
 import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
@@ -41,9 +42,9 @@ function TempBadge({ t }: { t: LeadTemperature }) {
   }
   const c = config[t]
   return (
-    <span style={{ background: c.bg, color: c.color, fontSize: 10, padding: '2px 8px', borderRadius: 12, fontWeight: 600, textTransform: 'uppercase' }}>
-      {t === 'hot' ? '🔥 Hot' : t === 'warm' ? '🟡 Warm' : '❄️ Cold'}
-    </span>
+        <span style={{ background: c.bg, color: c.color, fontSize: 10, padding: '2px 8px', borderRadius: 12, fontWeight: 600, textTransform: 'uppercase' }}>
+          {t === 'hot' ? '🔥 Hot' : t === 'warm' ? '🟡 Warm' : '❄️ Cold'}
+        </span>
   )
 }
 
@@ -147,6 +148,7 @@ export default function PipelinePage() {
   }
 
   return (
+  <DashboardLayout>
     <div style={{ padding: '24px', background: '#0D0D12', minHeight: '100vh' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[
@@ -181,5 +183,6 @@ export default function PipelinePage() {
         </DndContext>
       )}
     </div>
+  </DashboardLayout>
   )
 }
