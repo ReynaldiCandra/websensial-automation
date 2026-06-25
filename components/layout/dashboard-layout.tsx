@@ -34,6 +34,8 @@ const navigationItems = [
   { icon: Package, label: 'Products', href: '/dashboard/products' },
   { icon: BarChart3, label: 'Analytics', href: '/dashboard/analytics' },
   { icon: CreditCard, label: 'Credits', href: '/dashboard/credits' },
+  { icon: Users, label: 'Tim', href: '/dashboard/settings/team' },
+  { icon: FileText, label: 'API Docs', href: '/dashboard/api-docs' },
   { icon: Settings, label: 'Settings', href: '/dashboard/settings' },
 ]
 
