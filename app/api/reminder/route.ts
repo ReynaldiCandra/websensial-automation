@@ -6,12 +6,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Groq from 'groq-sdk'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+// WAJIB ADA AGAR TIDAK DI-BUILD OLEH VERCEL
+export const dynamic = 'force-dynamic';
 
 async function sendWhatsApp(phone: string, message: string) {
   try {
@@ -31,17 +27,18 @@ async function sendWhatsApp(phone: string, message: string) {
 }
 
 async function generateReminderMessage(
+  groq: Groq,
   type: 'invoice' | 'inactive',
   context: { customerName: string; businessName: string; invoiceId?: string; daysSince?: number; tone?: string }
 ): Promise<string> {
   const toneHint = context.tone ?? 'ramah dan sopan'
 
   const prompt = type === 'invoice'
-    ? `Buat pesan reminder pembayaran invoice WhatsApp untuk ${context.customerName}. 
-       Bisnis: ${context.businessName}. Invoice: ${context.invoiceId}.
-       Tone: ${toneHint}. Maksimal 3 kalimat, natural, tidak terkesan spam.`
+    ? `Buat pesan reminder pembayaran invoice WhatsApp untuk ${context.customerName}.
+         Bisnis: ${context.businessName}. Invoice: ${context.invoiceId}.
+         Tone: ${toneHint}. Maksimal 3 kalimat, natural, tidak terkesan spam.`
     : `Buat pesan follow-up untuk lead ${context.customerName} yang tidak membalas selama ${context.daysSince} hari.
-       Bisnis: ${context.businessName}. Tone: ${toneHint}. Singkat, friendly, ajak bicara lagi.`
+         Bisnis: ${context.businessName}. Tone: ${toneHint}. Singkat, friendly, ajak bicara lagi.`
 
   try {
     const completion = await groq.chat.completions.create({
@@ -69,11 +66,17 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  // 1. PINDAHKAN INISIALISASI KE SINI (Di DALAM fungsi POST)
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  )
+  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
+
   const results = { invoiceReminders: 0, inactiveFollowups: 0, errors: 0 }
 
   try {
     // ── 1. Invoice Payment Reminders ──────────────────────────
-    // Find invoices pending > 24h and < 3 reminders sent
     const cutoff24h  = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const cutoff72h  = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString()
 
@@ -88,14 +91,13 @@ export async function POST(req: NextRequest) {
       const lead = invoice.leads as { name: string; phone: string; workspace_id: string } | null
       if (!lead?.phone) continue
 
-      // Get AI settings for this workspace
       const { data: settings } = await supabase
         .from('ai_settings')
         .select('business_name, tone')
         .eq('workspace_id', lead.workspace_id)
         .single()
 
-      const message = await generateReminderMessage('invoice', {
+      const message = await generateReminderMessage(groq, 'invoice', {
         customerName: lead.name,
         businessName: settings?.business_name ?? 'kami',
         invoiceId: invoice.id.slice(0, 8).toUpperCase(),
@@ -107,7 +109,6 @@ export async function POST(req: NextRequest) {
       const sent = await sendWhatsApp(lead.phone, message)
 
       if (sent) {
-        // Update reminder count + log
         await Promise.all([
           supabase
             .from('invoices')
@@ -132,7 +133,6 @@ export async function POST(req: NextRequest) {
     }
 
     // ── 2. Inactive Chat Follow-ups ───────────────────────────
-    // Leads that haven't responded in 48h and haven't been followed up in 48h
     const { data: inactiveLeads } = await supabase
       .from('leads')
       .select('*, workspace_id')
@@ -143,7 +143,6 @@ export async function POST(req: NextRequest) {
     for (const lead of inactiveLeads ?? []) {
       if (!lead.phone) continue
 
-      // Check if we sent a followup in the last 48h
       const { data: recentLog } = await supabase
         .from('reminder_logs')
         .select('id')
@@ -152,7 +151,7 @@ export async function POST(req: NextRequest) {
         .gt('sent_at', cutoff72h)
         .limit(1)
 
-      if (recentLog && recentLog.length > 0) continue // already followed up
+      if (recentLog && recentLog.length > 0) continue
 
       const daysSince = Math.floor((Date.now() - new Date(lead.last_seen_at).getTime()) / (1000 * 60 * 60 * 24))
 
@@ -162,7 +161,7 @@ export async function POST(req: NextRequest) {
         .eq('workspace_id', lead.workspace_id)
         .single()
 
-      const message = await generateReminderMessage('inactive', {
+      const message = await generateReminderMessage(groq, 'inactive', {
         customerName: lead.name ?? 'Kak',
         businessName: settings?.business_name ?? 'kami',
         daysSince,
