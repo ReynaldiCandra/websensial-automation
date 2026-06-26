@@ -249,6 +249,6 @@ export default function ChatsPage() {
           </div>
         )}
       </div>
-    </DashboardLaut>
+    </DashboardLayout>
   )
 }
