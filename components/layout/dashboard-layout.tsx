@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import {
-  LayoutDashboard, MessageCircle, BrainCircuit, Users, GitBranch,
+  LayoutDashboard, MessageCircle, Smartphone, BrainCircuit, Users, GitBranch,
   FileText, Receipt, CreditCard, Package, BarChart2,
   Zap, Settings, ChevronLeft, Menu, X,
 } from 'lucide-react'
