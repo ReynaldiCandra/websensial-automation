@@ -174,7 +174,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Gagal memuat data',
-        description: error instanceof Error ? error.message : 'Unknown error',
+        description: error instanceof Error ? error.message : (error as any)?.message ?? 'Unknown error',
         variant: 'error',
       })
     } finally {
@@ -215,7 +215,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Gagal menyimpan',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     } finally {
@@ -274,7 +274,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Gagal menyimpan produk',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     } finally {
@@ -292,7 +292,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Gagal menghapus produk',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     }
@@ -337,7 +337,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Import CSV gagal',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     } finally {
@@ -363,7 +363,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Gagal menyimpan FAQ',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     }
@@ -384,7 +384,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Gagal menambah FAQ',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     }
@@ -400,7 +400,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Gagal menghapus FAQ',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     }
@@ -429,7 +429,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Test AI gagal',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     } finally {
@@ -495,7 +495,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Upload gagal',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     } finally {
@@ -526,7 +526,7 @@ function AiTrainingContent() {
     } catch (error) {
       toast({
         title: 'Scan brand gagal',
-        description: error instanceof Error ? error.message : undefined,
+        description: error instanceof Error ? error.message : (error as any)?.message,
         variant: 'error',
       })
     } finally {
