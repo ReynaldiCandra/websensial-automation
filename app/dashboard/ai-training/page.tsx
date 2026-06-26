@@ -63,11 +63,11 @@ interface Faq {
 
 interface TrainingDocument {
   id: string
-  file_name: string
-  file_type: string
-  file_url: string | null
+  name: string
+  type: string
+  url: string | null
   status: DocStatus
-  brand_url: string | null
+  content: string | null
   created_at: string
 }
 
@@ -937,10 +937,10 @@ function AiTrainingContent() {
                         <div className="flex items-center gap-3 min-w-0">
                           <FileText className="size-5 text-muted-foreground shrink-0" />
                           <div className="min-w-0">
-                            <p className="text-sm font-medium truncate">{doc.file_name}</p>
+                            <p className="text-sm font-medium truncate">{doc.name}</p>
                             <p className="text-xs text-muted-foreground">
-                              {doc.file_type.toUpperCase()}
-                              {doc.brand_url && ` · ${doc.brand_url}`}
+                              {doc.type?.toUpperCase() ?? "FILE"}
+                              {doc.url && ` · ${doc.url}`}
                             </p>
                           </div>
                         </div>
