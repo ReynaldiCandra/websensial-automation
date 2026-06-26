@@ -148,7 +148,7 @@ export default function PipelinePage() {
   }
 
   return (
-  <DashboardLayout>
+    <DashboardLayout>
     <div style={{ padding: '24px', background: '#0D0D12', minHeight: '100vh' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 24 }}>
         {[
@@ -183,6 +183,6 @@ export default function PipelinePage() {
         </DndContext>
       )}
     </div>
-  </DashboardLayout>
+    </DashboardLayout>
   )
 }

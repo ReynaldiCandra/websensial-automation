@@ -1,81 +1,63 @@
 // app/api/webhooks/waha/route.ts
-// WAHA WhatsApp Webhook — handles incoming messages
-// Includes: multi-language detection, tone customization, fallback to human, auto lead scoring
+// Schema: company_id, chats+chat_messages, ai_training (user_id), lead_score
 
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import Groq from 'groq-sdk'
 
-// WAJIB ADA AGAR TIDAK DI-BUILD OLEH VERCEL
-export const dynamic = 'force-dynamic';
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
-// ─── Detect language from text ────────────────────────────────
+// ─── Language detection ────────────────────────────────────
 function detectLanguage(text: string): string {
-  const lower = text.toLowerCase()
-  if (/\b(halo|aku|kamu|tolong|berapa|mau|bisa|dong|kak|nih|yuk)\b/.test(lower)) return 'id'
-  if (/\b(hello|please|price|want|can|how|much|need)\b/.test(lower)) return 'en'
+  const l = text.toLowerCase()
+  if (/\b(halo|aku|kamu|tolong|berapa|mau|bisa|dong|kak|nih|yuk|harga|produk)\b/.test(l)) return 'id'
+  if (/\b(hello|please|price|want|can|how|much|need|hi|thanks)\b/.test(l)) return 'en'
   if (/\b(你好|价格|多少|需要)\b/.test(text)) return 'zh'
-  return 'id' // default
+  return 'id'
 }
 
-// ─── Build AI system prompt ───────────────────────────────────
-function buildSystemPrompt(ctx: {
-  businessName: string
-  tone: string
-  instructions: string
+// ─── Build system prompt ───────────────────────────────────
+function buildPrompt(ctx: {
+  businessName: string; tone: string; instructions: string
   products: { name: string; price: number; description: string }[]
   faqs: { question: string; answer: string }[]
   language: string
-  aiMode: string
 }): string {
-  const langMap: Record<string, string> = {
-    id: 'Bahasa Indonesia',
-    en: 'English',
-    zh: 'Mandarin',
-  }
-  const langLabel = langMap[ctx.language] ?? 'Bahasa Indonesia'
-
+  const langLabel: Record<string, string> = { id: 'Bahasa Indonesia', en: 'English', zh: 'Mandarin' }
   const productList = ctx.products.length
-    ? ctx.products.map(p => `- ${p.name}: Rp${p.price?.toLocaleString('id-ID') ?? 0} — ${p.description}`).join('\n')
+    ? ctx.products.map(p => `- ${p.name}: Rp${Number(p.price).toLocaleString('id-ID')} — ${p.description ?? ''}`).join('\n')
     : 'Belum ada produk terdaftar.'
-
   const faqList = ctx.faqs.length
     ? ctx.faqs.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n')
     : 'Belum ada FAQ.'
 
   return `Kamu adalah AI Sales Agent untuk ${ctx.businessName}.
-Tone & Gaya: ${ctx.tone || 'ramah, sopan, dan profesional'}.
-Instruksi khusus: ${ctx.instructions || 'Bantu customer dari tanya harga sampai closing.'}
-Mode AI: ${ctx.aiMode}.
-SELALU balas dalam ${langLabel}.
+Tone: ${ctx.tone || 'ramah dan profesional'}.
+${ctx.instructions ? `Instruksi: ${ctx.instructions}` : ''}
+BALAS dalam: ${langLabel[ctx.language] ?? 'Bahasa Indonesia'}.
 
-=== DATA PRODUK ===
+=== PRODUK ===
 ${productList}
 
 === FAQ ===
 ${faqList}
 
 === PANDUAN ===
-- Jika customer tanya harga, jawab dengan harga dari data produk di atas
-- Jika customer menunjukkan intent beli (minta invoice, konfirmasi order, dll), tawarkan untuk kirim quotation/invoice
-- Jika tidak tahu jawaban, katakan jujur dan tawarkan bantuan tim
-- Jangan pernah mengarang informasi yang tidak ada di data
-- Respons singkat dan natural, tidak perlu sangat panjang
-- Jangan gunakan markdown (**, ##) dalam respons`
+- Jawab berdasarkan data produk & FAQ di atas
+- Jika customer minta harga spesifik / invoice / quotation → tawarkan
+- Jika tidak tahu → jujur, tawarkan sambungkan ke tim
+- Respons singkat, natural, tanpa markdown`
 }
 
 export async function POST(req: NextRequest) {
-  // 1. PINDAHKAN INISIALISASI KE SINI (Di DALAM fungsi POST)
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-  const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-
   try {
     const body = await req.json()
 
-    // Support both WAHA and Baileys webhook formats
+    // Support WAHA & Baileys format
     const event   = body.event ?? body.type
     const payload = body.payload ?? body
 
@@ -87,28 +69,29 @@ export async function POST(req: NextRequest) {
     const msgBody = payload.body ?? payload.message?.conversation ?? payload.message?.extendedTextMessage?.text ?? ''
 
     if (!from || !msgBody || from.includes('@g.us')) {
-      // Skip group messages
       return NextResponse.json({ ok: true, skipped: 'group or empty' })
     }
 
-    // Normalize phone number
     const phone = from.replace('@s.whatsapp.net', '').replace(/\D/g, '')
 
-    // Find workspace by connected phone
-    const { data: session } = await supabase
-      .from('waha_sessions')
-      .select('workspace_id')
-      .limit(1)
+    // ── 1. Cari company dari sesi WhatsApp ────────────────────
+    // Ambil company_id dari env atau match nomor WA
+    const companyId = process.env.DEFAULT_COMPANY_ID
+    if (!companyId) return NextResponse.json({ ok: false, error: 'DEFAULT_COMPANY_ID not set' })
+
+    // Ambil owner_id dari companies
+    const { data: company } = await supabase
+      .from('companies')
+      .select('id, name, owner_id')
+      .eq('id', companyId)
       .single()
+    if (!company) return NextResponse.json({ ok: false, error: 'Company not found' })
 
-    const workspaceId = session?.workspace_id ?? process.env.DEFAULT_WORKSPACE_ID
-    if (!workspaceId) return NextResponse.json({ ok: false, error: 'No workspace' })
-
-    // ── 1. Find or create lead ────────────────────────────────
+    // ── 2. Cari atau buat lead ────────────────────────────────
     let { data: lead } = await supabase
       .from('leads')
       .select('*')
-      .eq('workspace_id', workspaceId)
+      .eq('company_id', companyId)
       .eq('phone', phone)
       .single()
 
@@ -116,84 +99,108 @@ export async function POST(req: NextRequest) {
       const { data: newLead } = await supabase
         .from('leads')
         .insert({
-          workspace_id: workspaceId,
+          company_id: companyId,
           phone,
           name: payload.notifyName ?? phone,
           status: 'new',
           temperature: 'cold',
-          score: 10,
+          lead_score: 10,
+          source: 'whatsapp',
         })
         .select()
         .single()
       lead = newLead
     }
 
-    // ── 2. Store incoming message ─────────────────────────────
-    await supabase.from('messages').insert({
-      workspace_id: workspaceId,
-      lead_id: lead?.id,
-      phone,
-      content: msgBody,
+    // ── 3. Cari atau buat chat ────────────────────────────────
+    let { data: chat } = await supabase
+      .from('chats')
+      .select('id')
+      .eq('company_id', companyId)
+      .eq('lead_id', lead?.id)
+      .single()
+
+    if (!chat) {
+      const { data: newChat } = await supabase
+        .from('chats')
+        .insert({
+          company_id: companyId,
+          lead_id: lead?.id,
+          whatsapp_contact_id: phone,
+          status: 'open',
+        })
+        .select('id')
+        .single()
+      chat = newChat
+    }
+
+    // ── 4. Simpan pesan masuk ke chat_messages ────────────────
+    await supabase.from('chat_messages').insert({
+      chat_id: chat?.id,
       sender_type: 'customer',
+      sender_id: phone,
+      message_text: msgBody,
+      message_type: 'text',
     })
 
-    // ── 3. Update lead last seen ──────────────────────────────
-    await supabase
-      .from('leads')
-      .update({ last_message: msgBody.slice(0, 200), last_seen_at: new Date().toISOString() })
-      .eq('phone', phone)
-      .eq('workspace_id', workspaceId)
+    // Update lead last_message & last_seen_at
+    await supabase.from('leads').update({
+      last_message: msgBody.slice(0, 200),
+      last_seen_at: new Date().toISOString(),
+    }).eq('id', lead?.id).eq('company_id', companyId)
 
-    // ── 4. Check if escalated (human takes over) ──────────────
+    // Update chat last_message_at
+    await supabase.from('chats').update({
+      last_message_at: new Date().toISOString(),
+    }).eq('id', chat?.id)
+
+    // ── 5. Cek escalasi (human takeover) ──────────────────────
     if (lead?.is_escalated) {
       return NextResponse.json({ ok: true, mode: 'human_escalated' })
     }
 
-    // ── 5. Load AI settings ───────────────────────────────────
-    const [{ data: settings }, { data: products }, { data: faqs }] = await Promise.all([
-      supabase.from('ai_settings').select('*').eq('workspace_id', workspaceId).single(),
-      supabase.from('products').select('*').eq('workspace_id', workspaceId),
-      supabase.from('faqs').select('*').eq('workspace_id', workspaceId),
+    // ── 6. Load AI settings dari ai_training (user_id) ───────
+    const [{ data: aiTraining }, { data: products }, { data: faqs }] = await Promise.all([
+      supabase.from('ai_training').select('*').eq('user_id', company.owner_id).single(),
+      supabase.from('products').select('name, price, description').eq('user_id', company.owner_id),
+      supabase.from('faqs').select('question, answer').eq('user_id', company.owner_id),
     ])
 
-    const aiMode = settings?.ai_mode ?? 'auto'
-
-    // If AI mode is off or manual, skip
+    const aiMode = aiTraining?.ai_mode ?? 'auto'
     if (aiMode === 'manual' || aiMode === 'off') {
       return NextResponse.json({ ok: true, mode: 'manual' })
     }
 
-    // ── 6. Detect language (if multi-language enabled) ────────
-    const useMultiLang  = settings?.multi_language ?? false
-    const detectedLang  = useMultiLang ? detectLanguage(msgBody) : (settings?.default_language ?? 'id')
-
-    // ── 7. Get chat history ───────────────────────────────────
+    // ── 7. Ambil riwayat chat dari chat_messages ──────────────
     const { data: history } = await supabase
-      .from('messages')
-      .select('content, sender_type')
-      .eq('workspace_id', workspaceId)
-      .eq('phone', phone)
+      .from('chat_messages')
+      .select('message_text, sender_type')
+      .eq('chat_id', chat?.id)
       .order('created_at', { ascending: true })
       .limit(20)
 
     const chatHistory = (history ?? []).map(m => ({
       role: m.sender_type === 'customer' ? 'user' : 'assistant',
-      content: m.content,
+      content: m.message_text,
     })) as { role: 'user' | 'assistant'; content: string }[]
 
-    // ── 8. Generate AI reply ──────────────────────────────────
-    const systemPrompt = buildSystemPrompt({
-      businessName: settings?.business_name ?? 'bisnis kami',
-      tone: settings?.tone ?? '',
-      instructions: settings?.special_instructions ?? '',
+    // ── 8. Detect language ────────────────────────────────────
+    const usedLang = aiTraining?.multi_language
+      ? detectLanguage(msgBody)
+      : (aiTraining?.default_language ?? 'id')
+
+    // ── 9. Generate AI reply ──────────────────────────────────
+    const systemPrompt = buildPrompt({
+      businessName: aiTraining?.business_name ?? company.name ?? 'bisnis kami',
+      tone: aiTraining?.tone ?? '',
+      instructions: aiTraining?.special_instructions ?? '',
       products: products ?? [],
       faqs: faqs ?? [],
-      language: detectedLang,
-      aiMode,
+      language: usedLang,
     })
 
     let aiReply = ''
-    let shouldFallback = false
+    let shouldEscalate = false
 
     try {
       const completion = await groq.chat.completions.create({
@@ -206,45 +213,27 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: msgBody },
         ],
       })
-
       aiReply = completion.choices[0]?.message?.content?.trim() ?? ''
-
-      // Check if AI itself suggests escalation
-      if (
-        aiReply.toLowerCase().includes('[eskalasi]') ||
-        aiReply.toLowerCase().includes('[escalate]')
-      ) {
-        shouldFallback = true
+      if (aiReply.toLowerCase().includes('[eskalasi]') || aiReply.toLowerCase().includes('[escalate]')) {
+        shouldEscalate = true
       }
     } catch (_) {
-      shouldFallback = true
+      shouldEscalate = true
     }
 
-    // ── 9. Fallback handling ──────────────────────────────────
-    const fallbackEnabled   = settings?.fallback_enabled ?? true
-    const fallbackThreshold = settings?.fallback_threshold ?? 2
-    const fallbackMsg       = settings?.fallback_message ?? 'Mohon tunggu, saya hubungkan ke tim kami.'
-
-    // Count consecutive unanswered / low-confidence messages
-    const recentAI = (history ?? []).filter(m => m.sender_type === 'ai').slice(-fallbackThreshold)
-    const allGeneric = recentAI.every(m =>
-      m.content.includes('mohon tunggu') || m.content.includes('tim kami')
-    )
-
-    if (fallbackEnabled && (shouldFallback || (recentAI.length >= fallbackThreshold && allGeneric))) {
-      // Escalate lead
-      await supabase
-        .from('leads')
-        .update({ is_escalated: true, escalated_at: new Date().toISOString() })
-        .eq('phone', phone)
-        .eq('workspace_id', workspaceId)
-
+    // ── 10. Escalate jika perlu ───────────────────────────────
+    const fallbackMsg = aiTraining?.fallback_message ?? 'Mohon tunggu, saya hubungkan ke tim kami.'
+    if (shouldEscalate || !aiReply) {
+      await supabase.from('leads').update({
+        is_escalated: true,
+        escalated_at: new Date().toISOString(),
+      }).eq('id', lead?.id).eq('company_id', companyId)
       aiReply = fallbackMsg
     }
 
     if (!aiReply) return NextResponse.json({ ok: true, skipped: 'empty reply' })
 
-    // ── 10. Send reply via WhatsApp ───────────────────────────
+    // ── 11. Kirim via WhatsApp ────────────────────────────────
     await fetch(`${process.env.WAHA_API_URL}/api/sendText`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -255,27 +244,26 @@ export async function POST(req: NextRequest) {
       }),
     })
 
-    // ── 11. Store AI reply ────────────────────────────────────
-    await supabase.from('messages').insert({
-      workspace_id: workspaceId,
-      lead_id: lead?.id,
-      phone,
-      content: aiReply,
-      sender_type: shouldFallback ? 'human' : 'ai',
+    // ── 12. Simpan balasan AI ke chat_messages ────────────────
+    await supabase.from('chat_messages').insert({
+      chat_id: chat?.id,
+      sender_type: shouldEscalate ? 'agent' : 'ai',
+      message_text: aiReply,
+      message_type: 'text',
     })
 
-    // ── 12. Async: re-score lead (fire and forget) ────────────
+    // ── 13. Re-score lead (fire & forget) ────────────────────
     if (lead?.id) {
       void fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/score-lead`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'x-workspace-id': workspaceId },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ leadId: lead.id, phone }),
-      }).catch(() => { /* non-blocking */ })
+      }).catch(() => {})
     }
 
     return NextResponse.json({ ok: true, replied: aiReply.slice(0, 50) })
   } catch (err) {
-    console.error('waha webhook error:', err)
+    console.error('[waha webhook]', err)
     return NextResponse.json({ error: 'Internal error' }, { status: 500 })
   }
 }

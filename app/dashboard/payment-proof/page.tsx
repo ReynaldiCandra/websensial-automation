@@ -63,7 +63,7 @@ export default function PaymentProofPage() {
   }
 
   return (
-  <DashboardLayout>
+    <DashboardLayout>
     <div style={{ padding: '24px', background: '#0D0D12', minHeight: '100vh' }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 28, fontWeight: 700, color: '#E2E8F0', margin: '0 0 8px' }}>
@@ -211,6 +211,6 @@ export default function PaymentProofPage() {
         </div>
       )}
     </div>
-  </DashboardLayout>
+    </DashboardLayout>
   )
 }

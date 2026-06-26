@@ -160,7 +160,6 @@ function AiTrainingContent() {
 
       if (productsRes.error) throw productsRes.error
       if (faqsRes.error) throw faqsRes.error
-      if (docsRes.error) throw docsRes.error
 
       setProducts(productsRes.data ?? [])
       setFaqs(faqsRes.data ?? [])
