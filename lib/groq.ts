@@ -43,7 +43,7 @@ if (!apiKey) {
 
 export const groqClient = new Groq({ apiKey })
 
-const MODEL = 'llama3-8b-8192' as const
+const MODEL = 'llama-3.1-8b-instant' as const
 
 const BUYING_SIGNAL_KEYWORDS = [
   'harga',
