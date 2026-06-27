@@ -42,18 +42,18 @@ async function generateReminderMessage(
 
   try {
     const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
+      model: 'llama-3.3-70b-versatile',
       temperature: 0.7,
       max_tokens: 150,
       messages: [
-        { role: 'system', content: 'Kamu menulis pesan WhatsApp reminder bisnis yang natural dan tidak spam.' },
+        { role: 'system', content: 'Kamu adalah Kak Alexa, CS yang ramah. Tulis pesan WhatsApp reminder yang natural, hangat, pakai kak/kakak, sebut diri saya bukan kami, max 3 kalimat, ada emoticon, tidak spam.' },
         { role: 'user', content: prompt },
       ],
     })
     return completion.choices[0]?.message?.content?.trim() ?? ''
   } catch (_) {
     if (type === 'invoice') {
-      return `Halo ${context.customerName}, apakah ada pertanyaan mengenai invoice? Kami siap membantu 😊`
+      return `Halo kak ${context.customerName}, ada yang bisa saya bantu terkait invoice-nya? Saya siap membantu ya kak 😊`
     }
     return `Halo ${context.customerName}, ada yang bisa kami bantu? Jangan ragu untuk bertanya!`
   }
@@ -135,7 +135,7 @@ export async function POST(req: NextRequest) {
     // ── 2. Inactive Chat Follow-ups ───────────────────────────
     const { data: inactiveLeads } = await supabase
       .from('leads')
-      .select('*, workspace_id')
+      .select('*')
       .not('temperature', 'eq', 'cold')
       .eq('is_escalated', false)
       .lt('last_seen_at', cutoff72h)
@@ -174,19 +174,13 @@ export async function POST(req: NextRequest) {
 
       if (sent) {
         await Promise.all([
-          supabase.from('messages').insert({
-            workspace_id: lead.workspace_id,
-            phone: lead.phone,
-            lead_id: lead.id,
-            content: message,
-            sender_type: 'ai',
-          }),
           supabase.from('reminder_logs').insert({
-            workspace_id: lead.workspace_id,
+            company_id: lead.company_id,
             lead_id: lead.id,
             phone: lead.phone,
             message,
             status: 'sent',
+            sent_at: new Date().toISOString(),
           }),
         ])
         results.inactiveFollowups++
