@@ -45,7 +45,7 @@ export default function ChatsPage() {
     if (companyId) return companyId
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return null
-    const { data } = await supabase.from('companies').select('id').eq('owner_id', user.id).single()
+    const { data } = await supabase.from('companies').select('id').eq('owner_id', user.id).eq('id', '8e0bcf1e-490b-4ee4-8bb3-70bb544e2bf3').single()
     const id = data?.id ?? null
     if (id) setCompanyId(id)
     return id
