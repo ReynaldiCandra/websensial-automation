@@ -72,8 +72,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ ok: true, skipped: 'group or empty' })
     }
 
-    const phone = from.replace('@s.whatsapp.net', '').replace(/\D/g, '')
-    console.log('[WAHA payload]', JSON.stringify({ from, msgBody: msgBody.slice(0,50), notifyName: payload.notifyName, _dataNotify: payload._data?.notifyName }))
+    const phone = from.replace(/@s\.whatsapp\.net$/, '').replace(/@lid$/, '').replace(/\D/g, '')
+    const contactName = payload.notifyName ?? payload._data?.notifyName ?? payload.pushName ?? payload._data?.pushName ?? null
 
     // ── 1. Cari company dari sesi WhatsApp ────────────────────
     // Ambil company_id dari env atau match nomor WA
@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
         .insert({
           company_id: companyId,
           phone,
-          name: payload.notifyName ?? phone,
+          name: contactName ?? phone,
           status: 'new',
           temperature: 'cold',
           lead_score: 10,
