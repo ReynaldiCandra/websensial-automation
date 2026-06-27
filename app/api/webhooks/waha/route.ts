@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
     }
 
     const phone = from.replace('@s.whatsapp.net', '').replace(/\D/g, '')
+    console.log('[WAHA payload]', JSON.stringify({ from, msgBody: msgBody.slice(0,50), notifyName: payload.notifyName, _dataNotify: payload._data?.notifyName }))
 
     // ── 1. Cari company dari sesi WhatsApp ────────────────────
     // Ambil company_id dari env atau match nomor WA
