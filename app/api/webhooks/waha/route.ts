@@ -237,7 +237,7 @@ export async function POST(req: NextRequest) {
     // ── 11. Kirim via WhatsApp ────────────────────────────────
     await fetch(`${process.env.WAHA_API_URL}/api/sendText`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': process.env.WAHA_API_KEY ?? '' },
       body: JSON.stringify({
         chatId: from,
         text: aiReply,
