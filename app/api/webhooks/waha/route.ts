@@ -73,7 +73,8 @@ export async function POST(req: NextRequest) {
     }
 
     const phone = from.replace(/@s\.whatsapp\.net$/, '').replace(/@lid$/, '').replace(/\D/g, '')
-    const contactName = payload.notifyName ?? payload._data?.notifyName ?? payload.pushName ?? payload._data?.pushName ?? null
+    const contactName = payload.pushName ?? payload._data?.pushName ?? payload.notifyName ?? payload._data?.notifyName ?? null
+    console.log('[NAME DEBUG]', JSON.stringify({ pushName: payload.pushName, notifyName: payload.notifyName, dataKeys: payload._data ? Object.keys(payload._data) : [] }))
 
     // ── 1. Cari company dari sesi WhatsApp ────────────────────
     // Ambil company_id dari env atau match nomor WA
