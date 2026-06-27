@@ -66,6 +66,10 @@ interface TrainingDocument {
   name: string
   type: string
   url: string | null
+  file_name: string | null
+  file_type: string | null
+  file_url: string | null
+  file_size: number | null
   status: DocStatus
   content: string | null
   created_at: string
