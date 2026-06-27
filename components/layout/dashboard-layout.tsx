@@ -128,6 +128,20 @@ export function Sidebar() {
           }
         </button>
       </div>
+      <div className="p-2 border-t border-border">
+        <button
+          onClick={async () => {
+            const { createClient } = await import('@/lib/supabase/client')
+            const supabase = createClient()
+            await supabase.auth.signOut()
+            window.location.href = '/auth/login'
+          }}
+          className="flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium text-muted-foreground hover:bg-red-500/10 hover:text-red-400 transition-colors w-full"
+        >
+          <LogOut className="w-4 h-4 flex-shrink-0" />
+          {!collapsed && <span>Keluar</span>}
+        </button>
+      </div>
     </aside>
   )
 }
