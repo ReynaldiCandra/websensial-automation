@@ -6,7 +6,7 @@ import Image from 'next/image'
 import {
   LayoutDashboard, MessageCircle, Smartphone, BrainCircuit, Users, GitBranch,
   FileText, Receipt, CreditCard, Package, BarChart2,
-  Zap, Settings, ChevronLeft, Menu,
+  Zap, Settings, ChevronLeft, Menu, LogOut,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
