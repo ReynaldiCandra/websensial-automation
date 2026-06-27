@@ -40,6 +40,8 @@ export default function ChatsPage() {
   const [suggestions, setSuggestions] = useState<SuggestedReply[]>([])
   const [loadingSug, setLoadingSug] = useState(false)
   const [showSug, setShowSug] = useState(false)
+  const [editingLeadId, setEditingLeadId] = useState<string | null>(null)
+  const [editingName, setEditingName] = useState('')
 
   const getCompanyId = useCallback(async (): Promise<string | null> => {
     if (companyId) return companyId
@@ -134,6 +136,17 @@ export default function ChatsPage() {
     void loadLeads()
   }
 
+  const saveName = async (lead: Lead) => {
+    const name = editingName.trim()
+    if (!name || name === lead.name) { setEditingLeadId(null); return }
+    const cid = await getCompanyId()
+    if (!cid) return
+    await supabase.from('leads').update({ name }).eq('id', lead.id).eq('company_id', cid)
+    setLeads(prev => prev.map(l => l.id === lead.id ? { ...l, name } : l))
+    if (selectedLead?.id === lead.id) setSelectedLead(prev => prev ? { ...prev, name } : prev)
+    setEditingLeadId(null)
+  }
+
   const filteredLeads = leads.filter(l => !search || l.name?.toLowerCase().includes(search.toLowerCase()) || l.phone?.includes(search) || l.last_message?.toLowerCase().includes(search.toLowerCase()))
 
   return (
@@ -157,7 +170,23 @@ export default function ChatsPage() {
                   <div className="w-9 h-9 rounded-full bg-primary/20 flex items-center justify-center text-primary font-semibold text-sm flex-shrink-0">{lead.name?.[0]?.toUpperCase() ?? '?'}</div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between">
-                      <span className="font-medium text-sm truncate">{lead.name ?? lead.phone}</span>
+                      {editingLeadId === lead.id ? (
+                        <input
+                          autoFocus
+                          className="font-medium text-sm bg-transparent border-b border-primary outline-none w-full"
+                          value={editingName}
+                          onChange={e => setEditingName(e.target.value)}
+                          onBlur={() => void saveName(lead)}
+                          onKeyDown={e => { e.stopPropagation(); if (e.key === 'Enter') void saveName(lead); if (e.key === 'Escape') setEditingLeadId(null) }}
+                          onClick={e => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span
+                          className="font-medium text-sm truncate hover:text-primary cursor-text"
+                          title="Klik untuk edit nama"
+                          onClick={e => { e.stopPropagation(); setEditingLeadId(lead.id); setEditingName(lead.name ?? lead.phone) }}
+                        >{lead.name ?? lead.phone}</span>
+                      )}
                       <span className="text-xs text-muted-foreground flex-shrink-0 ml-1">{lead.last_seen_at ? formatTime(lead.last_seen_at) : ''}</span>
                     </div>
                     <p className="text-xs text-muted-foreground truncate mt-0.5">{lead.last_message ?? 'Belum ada pesan'}</p>
