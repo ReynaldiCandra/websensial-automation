@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { DashboardLayout } from '@/components/layout/dashboard-layout'
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
+import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -18,27 +18,28 @@ import Link from 'next/link'
 
 interface Lead {
   id: string
-  name: string
+  name: string | null
   phone: string
-  email?: string
-  company?: string
-  status: string
+  email: string | null
+  status: string | null
   temperature: 'hot' | 'warm' | 'cold'
-  score: number
-  last_message?: string
-  last_seen_at?: string
+  lead_score: number
+  last_message: string | null
+  last_seen_at: string | null
   is_escalated: boolean
+  pipeline_stage: string | null
+  deal_value: number | null
   created_at: string
 }
 
 const tempIcon = (t: string) => {
-  if (t === 'hot')  return <Flame className="w-4 h-4 text-red-400" />
+  if (t === 'hot') return <Flame className="w-4 h-4 text-red-400" />
   if (t === 'warm') return <Thermometer className="w-4 h-4 text-yellow-400" />
   return <Snowflake className="w-4 h-4 text-blue-400" />
 }
 
 const tempBadge = (t: string) => {
-  if (t === 'hot')  return 'bg-red-500/10 text-red-400 border-red-500/30'
+  if (t === 'hot') return 'bg-red-500/10 text-red-400 border-red-500/30'
   if (t === 'warm') return 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30'
   return 'bg-blue-500/10 text-blue-400 border-blue-500/30'
 }
@@ -48,7 +49,7 @@ const scoreBar = (score: number) => (
     <div className="flex-1 bg-border rounded-full h-1.5 max-w-[80px]">
       <div
         className={`h-1.5 rounded-full ${score >= 70 ? 'bg-red-400' : score >= 40 ? 'bg-yellow-400' : 'bg-blue-400'}`}
-        style={{ width: `${score}%` }}
+        style={{ width: `${Math.min(100, Math.max(0, score))}%` }}
       />
     </div>
     <span className="text-xs font-medium">{score}</span>
@@ -57,27 +58,37 @@ const scoreBar = (score: number) => (
 
 export default function LeadsPage() {
   const supabase = createClient()
-  const [leads, setLeads]           = useState<Lead[]>([])
-  const [loading, setLoading]       = useState(true)
-  const [search, setSearch]         = useState('')
-  const [filter, setFilter]         = useState<'all' | 'hot' | 'warm' | 'cold' | 'escalated'>('all')
-  const [rescoring, setRescoring]   = useState<string | null>(null)
+  const [companyId, setCompanyId] = useState<string | null>(null)
+  const [leads, setLeads] = useState<Lead[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+  const [filter, setFilter] = useState<'all' | 'hot' | 'warm' | 'cold' | 'escalated'>('all')
+  const [rescoring, setRescoring] = useState<string | null>(null)
+
+  const getCompanyId = useCallback(async (): Promise<string | null> => {
+    if (companyId) return companyId
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return null
+    const { data } = await supabase.from('companies').select('id').eq('owner_id', user.id).single()
+    const id = data?.id ?? null
+    if (id) setCompanyId(id)
+    return id
+  }, [supabase, companyId])
 
   const loadLeads = useCallback(async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
+    const cid = await getCompanyId()
+    if (!cid) { setLoading(false); return }
     const { data } = await supabase
       .from('leads')
-      .select('*')
-      .eq('workspace_id', user.id)
-      .order('score', { ascending: false })
+      .select('id, name, phone, email, status, temperature, lead_score, last_message, last_seen_at, is_escalated, pipeline_stage, deal_value, created_at')
+      .eq('company_id', cid)
+      .order('lead_score', { ascending: false })
     if (data) setLeads(data as Lead[])
     setLoading(false)
-  }, [supabase])
+  }, [supabase, getCompanyId])
 
   useEffect(() => { void loadLeads() }, [loadLeads])
 
-  // Re-score a single lead via AI
   const rescore = async (lead: Lead) => {
     setRescoring(lead.id)
     try {
@@ -90,7 +101,7 @@ export default function LeadsPage() {
       if (data.score !== undefined) {
         setLeads(prev => prev.map(l =>
           l.id === lead.id
-            ? { ...l, score: data.score, temperature: data.temperature }
+            ? { ...l, lead_score: data.score, temperature: data.temperature ?? l.temperature }
             : l
         ))
       }
@@ -100,9 +111,9 @@ export default function LeadsPage() {
 
   const filtered = leads
     .filter(l => {
-      if (filter === 'hot')       return l.temperature === 'hot'
-      if (filter === 'warm')      return l.temperature === 'warm'
-      if (filter === 'cold')      return l.temperature === 'cold'
+      if (filter === 'hot') return l.temperature === 'hot'
+      if (filter === 'warm') return l.temperature === 'warm'
+      if (filter === 'cold') return l.temperature === 'cold'
       if (filter === 'escalated') return l.is_escalated
       return true
     })
@@ -110,7 +121,7 @@ export default function LeadsPage() {
       !search ||
       l.name?.toLowerCase().includes(search.toLowerCase()) ||
       l.phone?.includes(search) ||
-      l.company?.toLowerCase().includes(search.toLowerCase())
+      l.email?.toLowerCase().includes(search.toLowerCase())
     )
 
   const counts = {
@@ -128,7 +139,6 @@ export default function LeadsPage() {
           <p className="text-muted-foreground text-sm mt-1">Semua prospek dari WhatsApp, dinilai otomatis oleh AI</p>
         </div>
 
-        {/* Stats row */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
             { label: 'Hot Leads', value: counts.hot, icon: <Flame className="w-5 h-5 text-red-400" />, color: 'text-red-400' },
@@ -150,12 +160,11 @@ export default function LeadsPage() {
           ))}
         </div>
 
-        {/* Filters + Search */}
         <div className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="Cari nama, nomor, perusahaan..."
+              placeholder="Cari nama, nomor, email..."
               className="pl-9"
               value={search}
               onChange={e => setSearch(e.target.value)}
@@ -180,7 +189,6 @@ export default function LeadsPage() {
           </Button>
         </div>
 
-        {/* Table */}
         <Card>
           <CardContent className="p-0">
             <Table>
@@ -213,7 +221,7 @@ export default function LeadsPage() {
                     <TableCell>
                       <div>
                         <p className="font-medium">{lead.name ?? '—'}</p>
-                        {lead.company && <p className="text-xs text-muted-foreground">{lead.company}</p>}
+                        {lead.email && <p className="text-xs text-muted-foreground">{lead.email}</p>}
                         {lead.is_escalated && (
                           <span className="text-xs text-orange-400">⚡ Eskalasi</span>
                         )}
@@ -223,13 +231,13 @@ export default function LeadsPage() {
                     <TableCell>
                       <Badge variant="outline" className="capitalize text-xs">{lead.status ?? 'baru'}</Badge>
                     </TableCell>
-                    <TableCell>{scoreBar(lead.score ?? 0)}</TableCell>
+                    <TableCell>{scoreBar(lead.lead_score ?? 0)}</TableCell>
                     <TableCell>
-                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded border ${tempBadge(lead.temperature)}`}>
-                        {tempIcon(lead.temperature)} {lead.temperature}
+                      <span className={`inline-flex items-center gap-1 text-xs px-2 py-1 rounded border ${tempBadge(lead.temperature ?? 'cold')}`}>
+                        {tempIcon(lead.temperature ?? 'cold')} {lead.temperature ?? 'cold'}
                       </span>
                     </TableCell>
-                    <TableCell className="max-w-[180px]">
+                    <TableCell className="max-w-80px]">
                       <p className="text-xs text-muted-foreground truncate">{lead.last_message ?? '—'}</p>
                     </TableCell>
                     <TableCell>
@@ -249,7 +257,7 @@ export default function LeadsPage() {
                           {rescoring === lead.id
                             ? <RefreshCw className="w-4 h-4 animate-spin" />
                             : <TrendingUp className="w-4 h-4" />
-                          }
+                        }
                         </Button>
                       </div>
                     </TableCell>

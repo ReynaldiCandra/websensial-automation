@@ -1,96 +1,81 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
-import { getWhatsAppClient } from '@/lib/whatsapp/baileys-client'
+import { NextResponse } from 'next/server'
 
 export async function POST() {
+  const WAHA = process.env.WAHA_API_URL
+  const KEY = process.env.WAHA_API_KEY
+  const SESSION = process.env.WAHA_SESSION || 'default'
+
+  if (!WAHA || !KEY) {
+    return NextResponse.json({ error: 'Server WAHA env tidak lengkap' }, { status: 500 })
+  }
+
+  const headers = { 'Content-Type': 'application/json', 'X-Api-Key': KEY }
+
   try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
-
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const client = getWhatsAppClient(user.id)
-
-    if (client.isConnected) {
-      return NextResponse.json({
-        connected: true,
-        phone: client.phone,
-        battery: client.battery,
-        status: 'connected',
-      })
-    }
-
-    const qrPromise = client.waitForQR(30000)
-    await client.connect()
-
-    if (client.isConnected) {
-      return NextResponse.json({
-        connected: true,
-        phone: client.phone,
-        battery: client.battery,
-        status: 'connected',
-      })
-    }
-
-    const qr = await qrPromise
-
-    await supabase.from('whatsapp_sessions').upsert(
-      {
-        user_id: user.id,
-        connected: false,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'user_id' },
-    )
-
-    return NextResponse.json({
-      connected: false,
-      status: 'waiting_qr',
-      qr,
+    const getRes = await fetch(`${WAHA}/api/sessions/${SESSION}`, {
+      headers: { 'X-Api-Key': KEY },
+      cache: 'no-store',
     })
-  } catch (error) {
-    console.error('[whatsapp/connect] POST error:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to initiate WhatsApp connection',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 },
-    )
+
+    if (getRes.status === 404) {
+      const createRes = await fetch(`${WAHA}/api/sessions`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ name: SESSION, start: true }),
+      })
+      const createData = await createRes.json().catch(() => ({}))
+      if (!createRes.ok) {
+        return NextResponse.json({ error: `WAHA create error ${createRes.status}`, detail: createData }, { status: 502 })
+      }
+      return NextResponse.json(createData)
+    }
+
+    const existing = await getRes.json().catch(() => ({}))
+
+    if (existing?.status === 'WORKING' || existing?.status === 'SCAN_QR_CODE') {
+      return NextResponse.json(existing)
+    }
+
+    const startRes = await fetch(`${WAHA}/api/sessions/${SESSION}/start`, {
+      method: 'POST',
+      headers,
+    })
+    const startData = await startRes.json().catch(() => ({}))
+
+    if (!startRes.ok) {
+      return NextResponse.json({ error: `WAHA start error ${startRes.status}`, detail: startData }, { status: 502 })
+    }
+
+    return NextResponse.json(startData)
+  } catch (err) {
+    console.error('[whatsapp/connect] Fetch failed:', err)
+    return NextResponse.json({ error: 'Gagal connect ke WAHA server' }, { status: 502 })
   }
 }
 
 export async function DELETE() {
-  try {
-    const supabase = await createClient()
-    const {
-      data: { user },
-      error: authError,
-    } = await supabase.auth.getUser()
+  const WAHA = process.env.WAHA_API_URL
+  const KEY = process.env.WAHA_API_KEY
+  const SESSION = process.env.WAHA_SESSION || 'default'
 
-    if (authError || !user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!WAHA || !KEY) {
+    return NextResponse.json({ error: 'Server WAHA env tidak lengkap' }, { status: 500 })
+  }
+
+  try {
+    const res = await fetch(`${WAHA}/api/sessions/${SESSION}`, {
+      method: 'DELETE',
+      headers: { 'X-Api-Key': KEY },
+    })
+
+    if (!res.ok && res.status !== 404) {
+      const detail = await res.text().catch(() => '')
+      return NextResponse.json({ error: `WAHA error ${res.status}`, detail }, { status: 502 })
     }
 
-    const client = getWhatsAppClient(user.id)
-    await client.destroySession()
-
-    await supabase.from('whatsapp_sessions').delete().eq('user_id', user.id)
-
     return NextResponse.json({ success: true, message: 'Disconnected' })
-  } catch (error) {
-    console.error('[whatsapp/connect] DELETE error:', error)
-    return NextResponse.json(
-      {
-        error: 'Failed to disconnect WhatsApp',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 },
-    )
+  } catch (err) {
+    console.error('[whatsapp/connect] DELETE failed:', err)
+    return NextResponse.json({ error: 'Gagal disconnect dari WAHA server' }, { status: 502 })
   }
 }

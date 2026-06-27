@@ -3,36 +3,51 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
-import { createServerClient } from '@supabase/ssr'
-import { cookies } from 'next/headers'
+import { createClient } from '@/lib/supabase/server'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
-
-function createSupabase() {
-  const cookieStore = cookies()
-  return createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    { cookies: { get: (n: string) => cookieStore.get(n)?.value } }
-  )
-}
 
 type Temperature = 'hot' | 'warm' | 'cold'
 
 export async function POST(req: NextRequest) {
   try {
-    const { leadId, phone } = await req.json() as { leadId: string; phone: string }
+    const { leadId } = await req.json() as { leadId: string; phone?: string }
+    if (!leadId) return NextResponse.json({ error: 'leadId wajib diisi' }, { status: 400 })
 
-    const supabase = createSupabase()
+    const supabase = await createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    // Get last 20 messages
+    const { data: company } = await supabase
+      .from('companies')
+      .select('id')
+      .eq('owner_id', user.id)
+      .single()
+    if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
+
+    const { data: lead } = await supabase
+      .from('leads')
+      .select('id')
+      .eq('id', leadId)
+      .eq('company_id', company.id)
+      .single()
+    if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
+
+    const { data: chat } = await supabase
+      .from('chats')
+      .select('id')
+      .eq('lead_id', leadId)
+      .eq('company_id', company.id)
+      .single()
+
+    if (!chat) {
+      return NextResponse.json({ score: 10, temperature: 'cold', signals: ['Belum ada chat'] })
+    }
+
     const { data: msgs } = await supabase
-      .from('messages')
-      .select('content, sender_type, created_at')
-      .eq('workspace_id', user.id)
-      .eq('phone', phone)
+      .from('chat_messages')
+      .select('message_text, sender_type, created_at')
+      .eq('chat_id', chat.id)
       .order('created_at', { ascending: false })
       .limit(20)
 
@@ -42,7 +57,7 @@ export async function POST(req: NextRequest) {
 
     const transcript = msgs
       .reverse()
-      .map(m => `[${m.sender_type === 'customer' ? 'Customer' : 'AI'}]: ${m.content}`)
+      .map(m => `[${m.sender_type === 'customer' ? 'Customer' : 'AI'}]: ${m.message_text}`)
       .join('\n')
 
     const completion = await groq.chat.completions.create({
@@ -86,23 +101,20 @@ Respons HANYA dalam format JSON:
       if (match) result = JSON.parse(match[0])
     } catch (_) { /* use defaults */ }
 
-    // Clamp score
     result.score = Math.max(0, Math.min(100, result.score))
 
-    // Determine temperature from score if AI gave wrong value
-    if (result.score >= 70)      result.temperature = 'hot'
+    if (result.score >= 70) result.temperature = 'hot'
     else if (result.score >= 40) result.temperature = 'warm'
-    else                          result.temperature = 'cold'
+    else result.temperature = 'cold'
 
-    // Update lead in DB
     await supabase
       .from('leads')
       .update({
-        score: result.score,
+        lead_score: result.score,
         temperature: result.temperature,
       })
       .eq('id', leadId)
-      .eq('workspace_id', user.id)
+      .eq('company_id', company.id)
 
     return NextResponse.json(result)
   } catch (err) {

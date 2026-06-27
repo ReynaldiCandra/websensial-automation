@@ -1,8 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { getWhatsAppClient } from '@/lib/whatsapp/baileys-client'
 
 export async function POST(request: NextRequest) {
+  const WAHA = process.env.WAHA_API_URL
+  const KEY = process.env.WAHA_API_KEY
+  const SESSION = process.env.WAHA_SESSION || 'default'
+
+  if (!WAHA || !KEY) {
+    return NextResponse.json({ error: 'Server WAHA env tidak lengkap' }, { status: 500 })
+  }
+
   try {
     const supabase = await createClient()
     const {
@@ -15,58 +22,55 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { to, message, leadId } = body as {
-      to?: string
+    const { phone, message, chatId } = body as {
+      phone?: string
       message?: string
-      leadId?: string
+      chatId?: string
     }
 
-    if (!to || typeof to !== 'string') {
-      return NextResponse.json(
-        { error: 'Missing or invalid "to" field' },
-        { status: 400 },
-      )
+    if (!phone || typeof phone !== 'string') {
+      return NextResponse.json({ error: 'Missing or invalid "phone" field' }, { status: 400 })
     }
-
     if (!message || typeof message !== 'string' || !message.trim()) {
-      return NextResponse.json(
-        { error: 'Missing or invalid "message" field' },
-        { status: 400 },
-      )
+      return NextResponse.json({ error: 'Missing or invalid "message" field' }, { status: 400 })
     }
 
-    const client = getWhatsAppClient(user.id)
+    const digits = phone.replace(/\D/g, '')
+    const chatIdWa = digits.includes('@') ? phone : `${digits}@c.us`
 
-    if (!client.isConnected) {
-      return NextResponse.json(
-        { error: 'WhatsApp not connected. Scan QR code first.' },
-        { status: 409 },
-      )
+    const sendRes = await fetch(`${WAHA}/api/sendText`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Api-Key': KEY },
+      body: JSON.stringify({
+        chatId: chatIdWa,
+        text: message.trim(),
+        session: SESSION,
+      }),
+    })
+
+    if (!sendRes.ok) {
+      const detail = await sendRes.text().catch(() => '')
+      console.error(`[whatsapp/send] WAHA error ${sendRes.status}:`, detail)
+      return NextResponse.json({ error: `WAHA error ${sendRes.status}`, detail }, { status: 502 })
     }
 
-    const result = await client.sendMessage(to, message.trim())
+    const sendData = await sendRes.json().catch(() => ({}))
 
-    await supabase.from('chat_messages').insert({
-      chat_id: to,
-      sender_type: 'agent',
-      sender_id: user.id,
-      message_text: message.trim(),
-      message_type: 'text',
-      ...(leadId ? { lead_id: leadId } : {}),
-    })
+    if (chatId) {
+      await supabase.from('chat_messages').insert({
+        chat_id: chatId,
+        sender_type: 'agent',
+        sender_id: user.id,
+        message_text: message.trim(),
+        message_type: 'text',
+      })
+    }
 
-    return NextResponse.json({
-      success: true,
-      messageId: result.messageId,
-      timestamp: result.timestamp,
-    })
+    return NextResponse.json({ success: true, data: sendData })
   } catch (error) {
     console.error('[whatsapp/send] POST error:', error)
     return NextResponse.json(
-      {
-        error: 'Failed to send message',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
+      { error: 'Failed to send message', details: error instanceof Error ? error.message : 'Unknown error' },
       { status: 500 },
     )
   }
