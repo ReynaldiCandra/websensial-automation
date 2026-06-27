@@ -427,9 +427,7 @@ function AiTrainingContent() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Request failed')
-      setTestResult(
-        `${data.reply}\n\n[Confidence: ${data.confidence}% | Action: ${data.suggestedAction} | Lead: ${data.leadScore?.temperature} (${data.leadScore?.score})]`,
-      )
+      setTestResult(data.reply)
     } catch (error) {
       toast({
         title: 'Test AI gagal',
