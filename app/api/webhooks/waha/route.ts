@@ -35,22 +35,26 @@ function buildPrompt(ctx: {
     ? ctx.faqs.map(f => `Q: ${f.question}\nA: ${f.answer}`).join('\n\n')
     : 'Belum ada FAQ.'
 
-  return `Kamu adalah AI Sales Agent untuk ${ctx.businessName}.
-Tone: ${ctx.tone || 'ramah dan profesional'}.
-${ctx.instructions ? `Instruksi: ${ctx.instructions}` : ''}
-BALAS dalam: ${langLabel[ctx.language] ?? 'Bahasa Indonesia'}.
+  return `Kamu adalah admin WhatsApp untuk ${ctx.businessName}.
+Balas seperti admin CS yang ramah, singkat, dan natural — seperti chat WA sungguhan.
 
-=== PRODUK ===
+ATURAN WAJIB:
+- Maksimal 3 kalimat per balasan
+- JANGAN gunakan bullet point, tanda bintang, atau formatting apapun
+- Gunakan bahasa ${langLabel[ctx.language] ?? 'Indonesia'} yang santai tapi sopan
+- Panggiomer dengan "Kak" atau "Bapak/Ibu" 
+- Satu topik per balasan — jangan jawab semua sekaligus
+- Kalau tidak tahu → "Boleh saya tanyakan dulu ke tim ya Kak 🙏"
+- JANGAN ulangi pertanyaan balik kalau tidak perlu
+- Tone: ${ctx.tone || 'ramah, hangat, profesional'}
+${ctx.instructions ? `
+Instruksi khusus: ${ctx.instructions}` : ''}
+
+=== DATA BISNIS ===
 ${productList}
 
 === FAQ ===
-${faqList}
-
-=== PANDUAN ===
-- Jawab berdasarkan data produk & FAQ di atas
-- Jika customer minta harga spesifik / invoice / quotation → tawarkan
-- Jika tidak tahu → jujur, tawarkan sambungkan ke tim
-- Respons singkat, natural, tanpa markdown`
+${faqList}`
 }
 
 export async function POST(req: NextRequest) {
@@ -61,7 +65,7 @@ export async function POST(req: NextRequest) {
     const event   = body.event ?? body.type
     const payload = body.payload ?? body
 
-    if (event !== 'message' && event !== 'message.any') {
+    if (event !== 'message') {
       return NextResponse.json({ ok: true, skipped: true })
     }
 
