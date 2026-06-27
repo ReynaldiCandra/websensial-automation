@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Groq from 'groq-sdk'
 import { createClient } from '@/lib/supabase/server'
+import { createClient as createAdmin } from '@supabase/supabase-js'
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY })
 
@@ -14,22 +15,28 @@ export async function POST(req: NextRequest) {
     const { leadId } = await req.json() as { leadId: string; phone?: string }
     if (!leadId) return NextResponse.json({ error: 'leadId wajib diisi' }, { status: 400 })
 
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    const serviceKey = req.headers.get('x-service-key')
+    const isServiceCall = serviceKey === process.env.SUPABASE_SERVICE_ROLE_KEY
+    const supabase = isServiceCall
+      ? createAdmin(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!)
+      : await createClient()
+    let companyId: string
+    if (isServiceCall) {
+      companyId = process.env.DEFAULT_COMPANY_ID!
+    } else {
+      const { data: { user } } = await (supabase as any).auth.getUser()
+      if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      const { data: co } = await supabase.from('companies').select('id').eq('owner_id', user.id).single()
+      if (!co) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
+      companyId = co.id
+    }
 
-    const { data: company } = await supabase
-      .from('companies')
-      .select('id')
-      .eq('owner_id', user.id)
-      .single()
-    if (!company) return NextResponse.json({ error: 'Company not found' }, { status: 404 })
 
     const { data: lead } = await supabase
       .from('leads')
       .select('id')
       .eq('id', leadId)
-      .eq('company_id', company.id)
+      .eq('company_id', companyId)
       .single()
     if (!lead) return NextResponse.json({ error: 'Lead not found' }, { status: 404 })
 
@@ -37,7 +44,7 @@ export async function POST(req: NextRequest) {
       .from('chats')
       .select('id')
       .eq('lead_id', leadId)
-      .eq('company_id', company.id)
+      .eq('company_id', companyId)
       .single()
 
     if (!chat) {
@@ -114,7 +121,7 @@ Respons HANYA dalam format JSON:
         temperature: result.temperature,
       })
       .eq('id', leadId)
-      .eq('company_id', company.id)
+      .eq('company_id', companyId)
 
     return NextResponse.json(result)
   } catch (err) {

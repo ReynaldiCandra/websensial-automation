@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
     if (lead?.id) {
       void fetch(`${process.env.NEXT_PUBLIC_APP_URL}/api/ai/score-lead`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'x-service-key': process.env.SUPABASE_SERVICE_ROLE_KEY ?? '' },
         body: JSON.stringify({ leadId: lead.id, phone }),
       }).catch(() => {})
     }
