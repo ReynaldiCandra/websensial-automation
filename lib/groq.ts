@@ -239,7 +239,7 @@ export async function generateAIReply(
 
     const completion = await groqClient.chat.completions.create({
       model: MODEL,
-      max_tokens: 256,
+      max_tokens: 180,
       temperature: 0.5,
       stop: ['[Confidence', '[Action', '[Lead'],
       messages: [
