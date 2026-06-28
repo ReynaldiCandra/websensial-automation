@@ -12,7 +12,7 @@ Referensi fitur: https://jualin.ai
 - Next.js 16 (Turbopack), React 19, TypeScript, Tailwind, shadcn/ui
 - Supabase (Postgres + Auth + Realtime)
 - Groq SDK — model llama-3.3-70b-versatile (upgrade dari llama3-8b-8192)
-- WAHA self-hosted Railway, engine NOWEB, tier CORE, API Key: websensial123
+- WAHA self-hosted Railway, engine NOWEB, tier CORE, API Key: [REDACTED]
 - Deploy: Vercel
 - macOS, Cursor, npm
 

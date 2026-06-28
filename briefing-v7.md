@@ -12,7 +12,7 @@ Referensi fitur: https://jualin.ai
 - Next.js 16 (Turbopack), React 19, TypeScript, Tailwind, shadcn/ui
 - Supabase (Postgres + Auth + Realtime)
 - Groq SDK — model llama-3.3-70b-versatile
-- WAHA self-hosted Railway, engine NOWEB, tier CORE, API Key: websensial123
+- WAHA self-hosted Railway, engine NOWEB, tier CORE, API Key: [REDACTED]
 - Deploy: Vercel
 - macOS, Cursor, npm
 
@@ -160,5 +160,5 @@ new → contacted → interested → quotation_sent → invoice_sent → payment
 2. Klik Reconnect WhatsApp
 3. QR muncul otomatis → scan dengan HP Alexandria
 ATAU via curl:
-curl -X DELETE "https://waha-production-5547.up.railway.app/api/sessions/default" -H "X-Api-Key: websensial123"
-curl -X POST "https://waha-production-5547.up.railway.app/api/sessions" -H "X-Api-Key: websensial123" -H "Content-Type: application/json" -d '{"name":"default","start":true}'
+curl -X DELETE "https://waha-production-5547.up.railway.app/api/sessions/default" -H "X-Api-Key: [REDACTED]"
+curl -X POST "https://waha-production-5547.up.railway.app/api/sessions" -H "X-Api-Key: [REDACTED]" -H "Content-Type: application/json" -d '{"name":"default","start":true}'
