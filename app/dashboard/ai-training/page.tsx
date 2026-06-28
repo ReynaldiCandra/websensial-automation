@@ -248,8 +248,15 @@ function AiTrainingContent() {
     if (!userId || !productForm.name.trim()) return
     setSaving(true)
     try {
+      const { data: companyData } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('owner_id', userId)
+        .single()
+
       const payload = {
         user_id: userId,
+        company_id: companyData?.id ?? null,
         name: productForm.name.trim(),
         price: parseFloat(productForm.price) || 0,
         stock: parseInt(productForm.stock, 10) || 0,
