@@ -17,8 +17,20 @@ export default function DashboardPage() {
       const { data: { user: u } } = await supabase.auth.getUser()
       if (u) {
         setUser(u)
-        const { data: l } = await supabase.from('leads').select('*').eq('user_id', u.id).order('created_at', { ascending: false }).limit(5)
-        if (l) setLeads(l)
+        const { data: company } = await supabase
+          .from('companies')
+          .select('id')
+          .eq('owner_id', u.id)
+          .single()
+        if (company) {
+          const { data: l } = await supabase
+            .from('leads')
+            .select('*')
+            .eq('company_id', company.id)
+            .order('created_at', { ascending: false })
+            .limit(5)
+          if (l) setLeads(l)
+        }
       }
       setLoading(false)
     }
