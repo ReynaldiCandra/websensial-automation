@@ -29,6 +29,29 @@ function NotificationBell() {
   const supabase = createClient()
 
   useEffect(() => {
+    // Load initial notifs dari chat_messages terbaru
+    async function loadInitial() {
+      const companyId = '8e0bcf1e-490b-4ee4-8bb3-70bb544e2bf3'
+      const { data: msgs } = await supabase
+        .from('chat_messages')
+        .select('id, message_text, created_at, chat_id, sender_type')
+        .eq('sender_type', 'customer')
+        .order('created_at', { ascending: false })
+        .limit(5)
+      if (msgs && msgs.length > 0) {
+        const initial: Notification[] = msgs.map(m => ({
+          id: m.id,
+          title: '💬 Pesan Masuk',
+          message: (m.message_text ?? '').slice(0, 60),
+          type: 'new_message' as const,
+          time: new Date(m.created_at).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+          re: true,
+        }))
+        setNotifs(initial)
+      }
+    }
+    void loadInitial()
+
     const channel = supabase
       .channel('realtime-notifs')
       .on('postgres_changes', {

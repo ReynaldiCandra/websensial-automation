@@ -10,6 +10,8 @@ export default function DashboardPage() {
   const [user, setUser] = useState<any>(null)
   const [leads, setLeads] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
+  const [allLeads, setAllLeads] = useState<any[]>([])
+  const [activeChats, setActiveChats] = useState(0)
   const supabase = createClient()
 
   useEffect(() => {
@@ -17,33 +19,41 @@ export default function DashboardPage() {
       const { data: { user: u } } = await supabase.auth.getUser()
       if (u) {
         setUser(u)
-        const { data: company } = await supabase
-          .from('companies')
+        const companyId = '8e0bcf1e-490b-4ee4-8bb3-70bb544e2bf3'
+        const { data: l } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('company_id', companyId)
+          .order('created_at', { ascending: false })
+          .limit(5)
+        if (l) setLeads(l)
+        
+        const { data: allLeads } = await supabase
+          .from('leads')
+          .select('temperature')
+          .eq('company_id', companyId)
+        if (allLeads) setAllLeads(allLeads)
+        
+        const { data: chats } = await supabase
+          .from('chats')
           .select('id')
-          .eq('owner_id', u.id)
-          .single()
-        if (company) {
-          const { data: l } = await supabase
-            .from('leads')
-            .select('*')
-            .eq('company_id', company.id)
-            .order('created_at', { ascending: false })
-            .limit(5)
-          if (l) setLeads(l)
-        }
+          .eq('company_id', companyId)
+          .eq('status', 'open')
+        if (chats) setActiveChats(chats.length)
       }
       setLoading(false)
     }
     fetchData()
   }, [])
 
-  const hot = leads.filter(l => l.temperature === 'hot').length
-  const warm = leads.filter(l => l.temperature === 'warm').length
-  const cold = leads.filter(l => l.temperature === 'cold').length
+  const hot = allLeads.filter(l => l.temperature === 'hot').length
+  const warm = allLeads.filter(l => l.temperature === 'warm').length
+  const cold = allLeads.filter(l => l.temperature === 'cold').length
+  const totalLeads = allLeads.length
 
   const stats = [
-    { label: 'Total Leads', value: leads.length, icon: Users, color: '#6C3BF5', bg: 'rgba(108,59,245,0.12)', sub: '0% minggu ini', subColor: '#68D391' },
-    { label: 'Active Chats', value: 0, icon: MessageCircle, color: '#38BDF8', bg: 'rgba(56,189,248,0.12)', sub: 'Real-time', subColor: '#718096' },
+    { label: 'Total Leads', value: totalLeads, icon: Users, color: '#6C3BF5', bg: 'rgba(108,59,245,0.12)', sub: '0% minggu ini', subColor: '#68D391' },
+    { label: 'Active Chats', value: activeChats, icon: MessageCircle, color: '#38BDF8', bg: 'rgba(56,189,248,0.12)', sub: 'Real-time', subColor: '#718096' },
     { label: 'Conversion Rate', value: '0%', icon: TrendingUp, color: '#A78BFA', bg: 'rgba(167,139,250,0.12)', sub: 'Bulan ini', subColor: '#718096' },
     { label: 'Revenue', value: 'Rp 0', icon: DollarSign, color: '#68D391', bg: 'rgba(104,211,145,0.12)', sub: 'Bulan ini', subColor: '#718096' },
   ]
