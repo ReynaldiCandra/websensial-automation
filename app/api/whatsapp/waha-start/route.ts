@@ -41,6 +41,23 @@ export async function POST() {
       return NextResponse.json(existing)
     }
 
+    if (existing?.status === 'FAILED' || existing?.status === 'STOPPED') {
+      console.log(`[waha-start] Session ${existing?.status} — delete & recreate`)
+      await fetch(`${WAHA}/api/sessions/${SESSION}`, {
+        method: 'DELETE',
+        headers: { 'X-Api-Key': KEY },
+      })
+      await new Promise(r => setTimeout(r, 1500))
+      const recreateRes = await fetch(`${WAHA}/api/sessions`, {
+      method: 'POST',
+        headers,
+        body: JSON.stringify({ name: SESSION, start: true }),
+      })
+      const recreateData = await recreateRes.json().catch(() => ({}))
+      console.log('[waha-start] Recreated:', recreateData)
+      return NextResponse.json(recreateData)
+    }
+
     const startRes = await fetch(`${WAHA}/api/sessions/${SESSION}/start`, {
       method: 'POST',
       headers,
