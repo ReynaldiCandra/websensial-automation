@@ -86,7 +86,7 @@ export default function DashboardPage() {
                 <p style={{ fontSize: 12, color: '#4A5568', margin: '2px 0 0' }}>5 leads terbaru</p>
               </div>
               <Link href="/dashboard/leads" style={{ fontSize: 12, color: '#6C3BF5', textDecoration: 'none' }}>Lihat semua →</Link>
-           /div>
+            </div>
             {leads.length === 0 ? (
               <div style={{ padding: 48, textAlign: 'center' }}>
                 <p style={{ color: '#4A5568', fontSize: 13 }}>Belum ada leads.</p>
@@ -113,7 +113,8 @@ export default function DashboardPage() {
             )}
           </div>
 
-          <div style={{ background: '#16161F', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding:            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#F1F5F9', margin: '0 0 4px' }}>Lead Status</h3>
+          <div style={{ background: '#16161F', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 12, padding: 20 }}>
+            <h3 style={{ fontSize: 14, fontWeight: 600, color: '#F1F5F9', margin: '0 0 4px' }}>Lead Status</h3>
             <p style={{ fontSize: 12, color: '#4A5568', margin: '0 0 20px' }}>Distribusi temperature</p>
             {[
               { label: 'Hot', count: hot, icon: Flame, color: '#FC814A', bg: 'rgba(252,129,74,0.12)' },
