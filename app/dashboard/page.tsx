@@ -17,30 +17,14 @@ export default function DashboardPage() {
   useEffect(() => {
     async function fetchData() {
       const { data: { user: u } } = await supabase.auth.getUser()
-      if (u) {
-        setUser(u)
-        const companyId = '8e0bcf1e-490b-4ee4-8bb3-70bb544e2bf3'
-        const { data: l } = await supabase
-          .from('leads')
-          .select('*')
-          .eq('company_id', companyId)
-          .order('created_at', { ascending: false })
-          .limit(5)
-        if (l) setLeads(l)
-        
-        const { data: allLeads } = await supabase
-          .from('leads')
-          .select('temperature')
-          .eq('company_id', companyId)
-        if (allLeads) setAllLeads(allLeads)
-        
-        const { data: chats } = await supabase
-          .from('chats')
-          .select('id')
-          .eq('company_id', companyId)
-          .eq('status', 'open')
-        if (chats) setActiveChats(chats.length)
-      }
+      if (u) setUser(u)
+      
+      const res = await fetch('/api/dashboard/overview')
+      const data = await res.json()
+      
+      setLeads(data.leads?.slice(0, 5) ?? [])
+      setAllLeads(data.leads ?? [])
+      setActiveChats(data.activeChats ?? 0)
       setLoading(false)
     }
     fetchData()
