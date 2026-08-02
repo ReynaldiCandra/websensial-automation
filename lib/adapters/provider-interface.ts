@@ -55,7 +55,7 @@ export interface ProviderConfig {
  * All providers must implement these methods
  */
 export abstract class ProviderAdapter {
-  protected config: ProviderConfig
+  config: ProviderConfig
 
   constructor(config: ProviderConfig) {
     this.config = config

@@ -21,11 +21,10 @@ export interface DLTConfig extends ProviderConfig {
 }
 
 export class DLTAdapter extends ProviderAdapter {
-  private config!: DLTConfig
+  declare config: DLTConfig
 
   constructor(config: DLTConfig) {
     super(config)
-    this.config = config as DLTConfig
   }
 
   /**

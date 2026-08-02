@@ -24,11 +24,10 @@ export interface WhatsAppConfig extends ProviderConfig {
 }
 
 export class WhatsAppAdapter extends ProviderAdapter {
-  private config!: WhatsAppConfig
+  declare config: WhatsAppConfig
 
   constructor(config: WhatsAppConfig) {
     super(config)
-    this.config = config as WhatsAppConfig
   }
 
   /**

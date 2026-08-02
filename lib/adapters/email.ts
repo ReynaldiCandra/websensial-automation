@@ -22,11 +22,10 @@ export interface EmailConfig extends ProviderConfig {
 }
 
 export class EmailAdapter extends ProviderAdapter {
-  private config!: EmailConfig
+  declare config: EmailConfig
 
   constructor(config: EmailConfig) {
     super(config)
-    this.config = config as EmailConfig
   }
 
   /**
